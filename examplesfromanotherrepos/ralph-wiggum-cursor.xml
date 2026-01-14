@@ -1,0 +1,3845 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+assets/GIT_WORKFLOW.md
+assets/RALPH_TASK_EXAMPLE.md
+assets/RALPH_TASK_NARROWING_DEBUGGER.md
+assets/RALPH_TASK_TEMPLATE.md
+install.sh
+README.md
+references/CONTEXT_ENGINEERING.md
+references/GUARDRAILS.md
+scripts/init-ralph.sh
+scripts/ralph-common.sh
+scripts/ralph-loop.sh
+scripts/ralph-once.sh
+scripts/ralph-setup.sh
+scripts/stream-parser.sh
+SKILL.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="assets/GIT_WORKFLOW.md">
+# Ralph Wiggum Cursor Skill: Git Workflow for Cloud Mode
+
+This document outlines the git branching and merging strategy when using the Ralph Wiggum Cursor Skill in **Cloud Mode**. Understanding this workflow is crucial for seamless collaboration between your local environment and the automated Cloud Agents.
+
+## Core Concepts
+
+-   **`main` branch**: This is the primary branch representing the stable, human-supervised state of the project. All local development and manual interventions should happen on `main`.
+-   **`ralph-iteration-N` branches**: These are temporary, single-purpose branches created by the Cloud Agent Spawner. Each branch corresponds to one "fresh context" work session by a Cloud Agent.
+
+## The Workflow Cycle
+
+The process is a loop of local work, automated handoff, cloud-based work, and manual integration.
+
+### 1. Local Development (on `main`)
+
+-   You begin the task by working in your local Cursor environment on the `main` branch.
+-   You use the Ralph skill, which tracks context usage via its hooks (`beforeSubmitPrompt`, `beforeReadFile`, etc.).
+-   You commit your changes to `main` as you make progress.
+
+### 2. Handoff to Cloud Agent (Automated)
+
+-   When the `stop-hook` detects that the context limit has been reached (a "gutter" situation), it triggers the `spawn-cloud-agent.sh` script.
+-   **Crucially, this script first commits any uncommitted local changes to your current branch (`main`) and force-pushes them to the remote origin.** This ensures the Cloud Agent starts with the absolute latest version of your work.
+-   The script then calls the Cursor API to spawn a new Cloud Agent.
+-   The new agent is instructed to:
+    -   Check out the `main` branch.
+    -   Create a new branch named `ralph-iteration-N` (e.g., `ralph-iteration-1`).
+    -   Begin work on this new branch.
+
+### 3. Cloud Agent Work (on `ralph-iteration-N`)
+
+-   The Cloud Agent operates entirely on its dedicated iteration branch.
+-   It reads the task definition (`RALPH_TASK.md`) and progress files (`.ralph/progress.md`) to understand the state of the project.
+-   It continues the task, committing its changes to the `ralph-iteration-N` branch.
+-   The agent works until it either completes the task, gets stuck (outputs `<ralph>GUTTER</ralph>`), or hits its own context limits.
+
+### 4. Merging Back to `main` (Manual)
+
+-   Once the Cloud Agent has finished its work (or you decide to intervene), you need to integrate its changes back into the `main` branch.
+-   This is a **manual step** that gives you full control and oversight.
+
+-   **Recommended process:**
+
+    1.  **Fetch the changes**: `git fetch origin`
+    2.  **Check out the agent's branch**: `git checkout ralph-iteration-1`
+    3.  **Review the work**: Examine the commits and the code changes made by the agent. Run tests (`npm test`) to ensure everything is working as expected.
+    4.  **Switch back to `main`**: `git checkout main`
+    5.  **Merge the changes**: `git merge --squash ralph-iteration-1`
+
+        -   We strongly recommend using `--squash` to condense all of the agent's incremental commits into a single, clean commit on the `main` branch. This keeps your `main` branch history tidy and meaningful.
+
+    6.  **Create a merge commit**: `git commit -m "feat: Integrate work from Ralph cloud iteration 1"`
+    7.  **Push the merged changes**: `git push origin main`
+
+### 5. Clean Up
+
+-   After successfully merging, you can delete the temporary iteration branch from both your local repository and the remote.
+
+    ```bash
+    # Delete local branch
+    git branch -d ralph-iteration-1
+
+    # Delete remote branch
+    git push origin --delete ralph-iteration-1
+    ```
+
+## Diagram of the Flow
+
+```
+(main)      A---B---------------------------G---H---> (local work)
+             \
+              \
+(ralph-iter-1) ---C---D---E---F------------> (cloud agent work)
+```
+
+-   **A, B**: Your local commits on `main`.
+-   **Handoff**: At commit `B`, the context limit is reached. Changes are pushed.
+-   **C, D, E, F**: Automated commits by the Cloud Agent on the `ralph-iteration-1` branch.
+-   **G**: You create a squash merge commit on `main` that incorporates all of the agent's work (C-F).
+-   **H**: You continue your local work on `main`.
+
+This workflow provides a robust and auditable process for autonomous development, combining the power of fresh-context AI agents with the safety of human-in-the-loop review and integration.
+</file>
+
+<file path="assets/RALPH_TASK_EXAMPLE.md">
+---
+task: Build a REST API for task management
+test_command: "npm test"
+completion_criteria:
+  - All CRUD endpoints working and tested
+  - Input validation implemented
+  - Tests passing with >80% coverage
+  - API documentation complete
+max_iterations: 50
+---
+
+# Task: Task Management REST API
+
+## Overview
+
+Build a simple but production-ready REST API for managing tasks (todo items). The API should follow REST conventions and include proper error handling, validation, and documentation.
+
+## Requirements
+
+### Functional Requirements
+
+1. **Create Task** - POST /tasks
+   - Accept title (required), description (optional), due_date (optional)
+   - Return created task with generated ID
+
+2. **List Tasks** - GET /tasks
+   - Return all tasks
+   - Support filtering by status (pending/completed)
+   - Support pagination (limit/offset)
+
+3. **Get Task** - GET /tasks/:id
+   - Return single task by ID
+   - Return 404 if not found
+
+4. **Update Task** - PUT /tasks/:id
+   - Update any task fields
+   - Return updated task
+   - Return 404 if not found
+
+5. **Delete Task** - DELETE /tasks/:id
+   - Remove task
+   - Return 204 on success
+   - Return 404 if not found
+
+6. **Complete Task** - PATCH /tasks/:id/complete
+   - Mark task as completed
+   - Set completed_at timestamp
+
+### Non-Functional Requirements
+
+- Response time < 100ms for all endpoints
+- Proper HTTP status codes
+- JSON error responses with meaningful messages
+- Request logging
+
+## Constraints
+
+- Use TypeScript
+- Use Express.js framework
+- Use SQLite for storage (file-based, no external DB needed)
+- Follow REST conventions
+- No authentication required (keep it simple)
+
+## Success Criteria
+
+The task is complete when ALL of the following are true:
+
+1. [ ] `npm start` runs the server without errors
+2. [ ] POST /tasks implemented (validation + tests)
+3. [ ] GET /tasks implemented (pagination/filtering + tests)
+4. [ ] GET /tasks/:id implemented (404 + tests)
+5. [ ] PUT /tasks/:id implemented (validation + 404 + tests)
+6. [ ] PATCH /tasks/:id/complete implemented (tests)
+7. [ ] DELETE /tasks/:id implemented (404 + tests)
+8. [ ] Test coverage > 80% (run `npm test -- --coverage`)
+9. [ ] README.md documents all endpoints with examples
+
+## Technical Notes
+
+Suggested project structure:
+```
+src/
+  index.ts        # Entry point
+  routes/
+    tasks.ts      # Task routes
+  models/
+    task.ts       # Task model/schema
+  db/
+    sqlite.ts     # Database setup
+  middleware/
+    validation.ts # Input validation
+tests/
+  tasks.test.ts   # API tests
+```
+
+## Example Requests
+
+```bash
+# Create task
+curl -X POST http://localhost:3000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Buy groceries", "description": "Milk, eggs, bread"}'
+
+# List tasks
+curl http://localhost:3000/tasks
+
+# Get task
+curl http://localhost:3000/tasks/1
+
+# Update task
+curl -X PUT http://localhost:3000/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Buy groceries", "description": "Milk, eggs, bread, cheese"}'
+
+# Complete task
+curl -X PATCH http://localhost:3000/tasks/1/complete
+
+# Delete task
+curl -X DELETE http://localhost:3000/tasks/1
+```
+
+---
+
+## Ralph Instructions
+
+When working on this task:
+
+1. Read `.ralph/progress.md` to see what's been done
+2. Check `.ralph/guardrails.md` for signs to follow
+3. Work on the next incomplete criterion from the checklist above
+4. Update `.ralph/progress.md` with your progress
+5. Commit your changes with descriptive messages
+6. Run tests frequently to verify progress
+7. When ALL criteria are met (all `[ ]` → `[x]`), output: `<ralph>COMPLETE</ralph>`
+8. If stuck on the same issue 3+ times, output: `<ralph>GUTTER</ralph>`
+</file>
+
+<file path="assets/RALPH_TASK_NARROWING_DEBUGGER.md">
+---
+task: Build "ts-narrow" - A TypeScript Type Narrowing Debugger
+test_command: "npm test"
+completion_criteria:
+  - CLI parses TypeScript files
+  - Tracks type of a variable through control flow
+  - Explains narrowing at each step
+  - Handles if/else, typeof, instanceof, truthiness
+  - Outputs human-readable explanation
+  - Final type at target line reflects narrowed scope correctly
+  - All test assertions pass
+max_iterations: 30
+---
+
+# Task: Build "ts-narrow" - TypeScript Type Narrowing Debugger
+
+Build a CLI tool that explains how TypeScript narrows types through control flow.
+
+## The Problem
+
+TypeScript's type narrowing is powerful but opaque. When narrowing doesn't work as expected, developers have no way to understand why.
+
+## The Solution
+
+A CLI that traces a variable through code and explains each narrowing step:
+
+```bash
+$ npx ts-node src/index.ts analyze test/truthiness.ts --variable x --line 4
+```
+
+## Technical Approach
+
+Use the TypeScript Compiler API to:
+1. Parse the source file into an AST
+2. Create a type checker instance
+3. Walk the AST tracking control flow
+4. At each narrowing point, record what happened
+5. Generate human-readable explanations
+
+## Success Criteria
+
+### Phase 1: Basic Parsing & Type Extraction
+1. [ ] CLI accepts a TypeScript file path
+2. [ ] Parses file using TypeScript Compiler API
+3. [ ] Can find a variable declaration by name
+4. [ ] Can get the type of a variable at declaration
+
+### Phase 2: Control Flow Tracking
+5. [ ] Tracks variable through if/else blocks
+6. [ ] Identifies narrowing points (if conditions)
+7. [ ] Records type before and after each narrowing
+8. [ ] Handles nested if/else correctly
+
+### Phase 3: Narrowing Detection
+9. [ ] Detects truthiness narrowing (`if (x)`)
+10. [ ] Detects typeof narrowing (`if (typeof x === 'string')`)
+11. [ ] Detects instanceof narrowing (`if (x instanceof Error)`)
+12. [ ] Detects equality narrowing (`if (x === null)`)
+13. [ ] Detects discriminated union narrowing (`if (x.kind === 'a')`)
+
+### Phase 4: Output & Explanation
+14. [ ] Generates step-by-step trace output
+15. [ ] Explains what caused each narrowing
+16. [ ] Shows what types were eliminated
+17. [ ] **CRITICAL: Final type at target line reflects the NARROWED type, not the original type**
+18. [ ] Handles "type not narrowed" cases with explanation
+
+### Phase 5: Edge Cases & Polish
+19. [ ] Works with type aliases and interfaces
+20. [ ] Handles function parameters
+21. [ ] Works with optional chaining (`x?.foo`)
+22. [ ] Provides helpful error for invalid inputs
+23. [ ] Has --json output option for tooling
+
+---
+
+## MANDATORY TEST CASES
+
+The test runner (`test/run-tests.js`) MUST verify these EXACT outputs. Tests that don't assert on exact expected strings are invalid.
+
+### Test 1: test/truthiness.ts
+```typescript
+function example(x: string | null) {
+  if (x) {
+    console.log(x.toUpperCase()) // line 4
+  }
+}
+```
+
+**Command:** `npx ts-node src/index.ts analyze test/truthiness.ts --variable x --line 4`
+
+**REQUIRED output must contain:** `Final type at line 4: string`
+
+**MUST NOT contain:** `Final type at line 4: string | null`
+
+Why: Line 4 is INSIDE the `if (x)` block, so `x` has been narrowed from `string | null` to `string`.
+
+---
+
+### Test 2: test/typeof.ts
+```typescript
+function process(value: string | number) {
+  if (typeof value === 'string') {
+    return value.toUpperCase() // line 4
+  }
+  return value.toFixed(2) // line 6
+}
+```
+
+**Command (line 4):** `npx ts-node src/index.ts analyze test/typeof.ts --variable value --line 4`
+**REQUIRED:** `Final type at line 4: string`
+
+**Command (line 6):** `npx ts-node src/index.ts analyze test/typeof.ts --variable value --line 6`
+**REQUIRED:** `Final type at line 6: number`
+
+---
+
+### Test 3: test/discriminated.ts
+```typescript
+type Result = 
+  | { ok: true; data: string }
+  | { ok: false; error: Error }
+
+function handle(result: Result) {
+  if (result.ok) {
+    console.log(result.data) // line 8
+  } else {
+    console.log(result.error) // line 10
+  }
+}
+```
+
+**Command (line 8):** `npx ts-node src/index.ts analyze test/discriminated.ts --variable result --line 8`
+**REQUIRED:** Output must indicate type is narrowed to the `{ ok: true; data: string }` variant
+
+**Command (line 10):** `npx ts-node src/index.ts analyze test/discriminated.ts --variable result --line 10`
+**REQUIRED:** Output must indicate type is narrowed to the `{ ok: false; error: Error }` variant
+
+---
+
+### Test 4: test/no-narrow.ts (Negative case)
+```typescript
+function broken(x: string | null) {
+  const y = x // y copies x's type
+  if (x) {
+    console.log(y.toUpperCase()) // line 5 - y is NOT narrowed!
+  }
+}
+```
+
+**Command:** `npx ts-node src/index.ts analyze test/no-narrow.ts --variable y --line 5`
+**REQUIRED:** `Final type at line 5: string | null`
+
+Why: The `if (x)` check narrows `x`, NOT `y`. Variable `y` retains its original type.
+
+---
+
+## Test Runner Requirements
+
+Create `test/run-tests.js` that:
+
+```javascript
+// PSEUDOCODE - implement this properly
+const tests = [
+  {
+    name: "truthiness narrowing",
+    file: "test/truthiness.ts",
+    variable: "x", 
+    line: 4,
+    mustContain: "Final type at line 4: string",
+    mustNotContain: "Final type at line 4: string | null"
+  },
+  // ... more tests
+];
+
+for (const test of tests) {
+  const output = runCommand(`npx ts-node src/index.ts analyze ${test.file} --variable ${test.variable} --line ${test.line}`);
+  
+  if (test.mustContain && !output.includes(test.mustContain)) {
+    console.error(`FAIL: ${test.name}`);
+    console.error(`  Expected to contain: "${test.mustContain}"`);
+    console.error(`  Actual output: "${output}"`);
+    process.exit(1);
+  }
+  
+  if (test.mustNotContain && output.includes(test.mustNotContain)) {
+    console.error(`FAIL: ${test.name}`);
+    console.error(`  Must NOT contain: "${test.mustNotContain}"`);
+    console.error(`  Actual output: "${output}"`);
+    process.exit(1);
+  }
+  
+  console.log(`PASS: ${test.name}`);
+}
+
+console.log("All tests passed!");
+process.exit(0);
+```
+
+**The test runner MUST:**
+1. Assert on EXACT expected strings (mustContain)
+2. Assert on strings that MUST NOT appear (mustNotContain)
+3. Exit with code 1 if ANY assertion fails
+4. Exit with code 0 only if ALL assertions pass
+
+---
+
+## File Structure
+
+```
+ts-narrow/
+├── src/
+│   ├── index.ts          # CLI entry point
+│   ├── parser.ts         # TypeScript parsing utilities
+│   ├── analyzer.ts       # Control flow analysis
+│   ├── narrowing.ts      # Narrowing detection logic
+│   ├── formatter.ts      # Output formatting
+│   └── types.ts          # Internal type definitions
+├── test/
+│   ├── truthiness.ts
+│   ├── typeof.ts
+│   ├── discriminated.ts
+│   ├── no-narrow.ts
+│   └── run-tests.js      # Test runner with assertions
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+## Dependencies
+
+- `typescript` (for Compiler API) - ONLY external dependency
+- Node.js built-ins only otherwise
+
+## Constraints
+
+- Must use TypeScript Compiler API (not regex/string parsing)
+- No external dependencies except `typescript`
+- **Tests must assert on exact expected outputs**
+- **Task is NOT complete until `npm test` exits with code 0**
+
+---
+
+## Ralph Instructions
+
+1. Work through phases in order
+2. **Run `npm test` after EVERY change**
+3. If tests fail, read the failure message and fix the code
+4. A criterion is only complete when relevant tests pass
+5. Commit after completing each criterion
+6. **Criterion 17 is CRITICAL** - the final type must reflect narrowing scope
+7. When ALL criteria are [x] AND `npm test` passes: `<ralph>COMPLETE</ralph>`
+8. If stuck on same issue 3+ times: `<ralph>GUTTER</ralph>`
+</file>
+
+<file path="assets/RALPH_TASK_TEMPLATE.md">
+---
+task: [Brief description of the task]
+completion_criteria:
+  - [Criterion 1 - must be objectively verifiable]
+  - [Criterion 2]
+  - [Criterion 3]
+max_iterations: 50
+---
+
+# Task: [Task Name]
+
+## Overview
+
+[Describe what needs to be built/fixed/improved]
+
+## Requirements
+
+### Functional Requirements
+
+1. [Requirement 1]
+2. [Requirement 2]
+3. [Requirement 3]
+
+### Non-Functional Requirements
+
+- [Performance, security, etc.]
+
+## Constraints
+
+- [Technology constraints]
+- [Time constraints]
+- [Other limitations]
+
+## Success Criteria
+
+The task is complete when ALL of the following are true:
+
+1. [ ] [Verifiable criterion 1]
+2. [ ] [Verifiable criterion 2]
+3. [ ] [Verifiable criterion 3]
+
+## Notes
+
+[Any additional context, links to documentation, etc.]
+
+---
+
+## Ralph Instructions
+
+When working on this task:
+
+1. Read `.ralph/progress.md` to see what's been done
+2. Check `.ralph/guardrails.md` for signs to follow
+3. Work on the next incomplete criterion
+4. Update `.ralph/progress.md` with your progress
+5. Commit your changes with descriptive messages
+6. When ALL criteria are met (all `[ ]` → `[x]`), output: `<ralph>COMPLETE</ralph>`
+7. If stuck on the same issue 3+ times, output: `<ralph>GUTTER</ralph>`
+</file>
+
+<file path="install.sh">
+#!/bin/bash
+# Ralph Wiggum: One-click installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/agrimsingh/ralph-wiggum-cursor/main/install.sh | bash
+
+set -euo pipefail
+
+REPO_RAW="https://raw.githubusercontent.com/agrimsingh/ralph-wiggum-cursor/main"
+
+echo "═══════════════════════════════════════════════════════════════════"
+echo "🐛 Ralph Wiggum Installer"
+echo "═══════════════════════════════════════════════════════════════════"
+echo ""
+
+# Check if we're in a git repo
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+  echo "⚠️  Warning: Not in a git repository."
+  echo "   Ralph works best with git for state persistence."
+  echo ""
+  echo "   Run: git init"
+  echo ""
+fi
+
+# Check for cursor-agent CLI
+if ! command -v cursor-agent &> /dev/null; then
+  echo "⚠️  Warning: cursor-agent CLI not found."
+  echo "   Install via: curl https://cursor.com/install -fsS | bash"
+  echo ""
+fi
+
+# Check for gum and offer to install
+if ! command -v gum &> /dev/null; then
+  echo "📦 gum not found (provides beautiful CLI menus)"
+  
+  # Auto-install if INSTALL_GUM=1 or prompt user
+  SHOULD_INSTALL=""
+  if [[ "${INSTALL_GUM:-}" == "1" ]]; then
+    SHOULD_INSTALL="y"
+  else
+    read -p "   Install gum? [y/N] " -n 1 -r < /dev/tty
+    echo
+    SHOULD_INSTALL="$REPLY"
+  fi
+  
+  if [[ "$SHOULD_INSTALL" =~ ^[Yy]$ ]]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      if command -v brew &> /dev/null; then
+        echo "   Installing via Homebrew..."
+        brew install gum
+      else
+        echo "   ⚠️  Homebrew not found. Install manually: brew install gum"
+      fi
+    elif [[ -f /etc/debian_version ]]; then
+      echo "   Installing via apt..."
+      sudo mkdir -p /etc/apt/keyrings
+      curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+      sudo apt update && sudo apt install -y gum
+    elif [[ -f /etc/fedora-release ]] || [[ -f /etc/redhat-release ]]; then
+      echo "   Installing via dnf..."
+      echo '[charm]
+name=Charm
+baseurl=https://repo.charm.sh/yum/
+enabled=1
+gpgcheck=1
+gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/yum.repos.d/charm.repo
+      sudo dnf install -y gum
+    else
+      echo "   ⚠️  Unknown Linux distro. Install manually: https://github.com/charmbracelet/gum#installation"
+    fi
+  fi
+  echo ""
+fi
+
+WORKSPACE_ROOT="$(pwd)"
+
+# =============================================================================
+# CREATE DIRECTORIES
+# =============================================================================
+
+echo "📁 Creating directories..."
+mkdir -p .cursor/ralph-scripts
+mkdir -p .ralph
+
+# =============================================================================
+# DOWNLOAD SCRIPTS
+# =============================================================================
+
+echo "📥 Downloading Ralph scripts..."
+
+SCRIPTS=(
+  "ralph-common.sh"
+  "ralph-setup.sh"
+  "ralph-loop.sh"
+  "ralph-once.sh"
+  "stream-parser.sh"
+  "init-ralph.sh"
+)
+
+for script in "${SCRIPTS[@]}"; do
+  if curl -fsSL "$REPO_RAW/scripts/$script" -o ".cursor/ralph-scripts/$script" 2>/dev/null; then
+    chmod +x ".cursor/ralph-scripts/$script"
+  else
+    echo "   ⚠️  Could not download $script (may not exist yet)"
+  fi
+done
+
+echo "✓ Scripts installed to .cursor/ralph-scripts/"
+
+
+# =============================================================================
+# INITIALIZE .ralph/ STATE
+# =============================================================================
+
+echo "📁 Initializing .ralph/ state directory..."
+
+cat > .ralph/guardrails.md << 'EOF'
+# Ralph Guardrails (Signs)
+
+> Lessons learned from past failures. READ THESE BEFORE ACTING.
+
+## Core Signs
+
+### Sign: Read Before Writing
+- **Trigger**: Before modifying any file
+- **Instruction**: Always read the existing file first
+- **Added after**: Core principle
+
+### Sign: Test After Changes
+- **Trigger**: After any code change
+- **Instruction**: Run tests to verify nothing broke
+- **Added after**: Core principle
+
+### Sign: Commit Checkpoints
+- **Trigger**: Before risky changes
+- **Instruction**: Commit current working state first
+- **Added after**: Core principle
+
+---
+
+## Learned Signs
+
+(Signs added from observed failures will appear below)
+
+EOF
+
+cat > .ralph/progress.md << 'EOF'
+# Progress Log
+
+> Updated by the agent after significant work.
+
+## Summary
+
+- Iterations completed: 0
+- Current status: Initialized
+
+## How This Works
+
+Progress is tracked in THIS FILE, not in LLM context.
+When context is rotated (fresh agent), the new agent reads this file.
+This is how Ralph maintains continuity across iterations.
+
+## Session History
+
+EOF
+
+cat > .ralph/errors.log << 'EOF'
+# Error Log
+
+> Failures detected by stream-parser. Use to update guardrails.
+
+EOF
+
+cat > .ralph/activity.log << 'EOF'
+# Activity Log
+
+> Real-time tool call logging from stream-parser.
+
+EOF
+
+echo "0" > .ralph/.iteration
+
+echo "✓ .ralph/ initialized"
+
+# =============================================================================
+# CREATE RALPH_TASK.md TEMPLATE
+# =============================================================================
+
+if [[ ! -f "RALPH_TASK.md" ]]; then
+  echo "📝 Creating RALPH_TASK.md template..."
+  cat > RALPH_TASK.md <<'TASKEOF'
+---
+task: Build a CLI todo app in TypeScript
+test_command: "npx ts-node todo.ts list"
+---
+
+# Task: CLI Todo App (TypeScript)
+
+Build a simple command-line todo application in TypeScript.
+
+## Requirements
+
+1. Single file: `todo.ts`
+2. Uses `todos.json` for persistence
+3. Three commands: add, list, done
+4. TypeScript with proper types
+
+## Success Criteria
+
+1. [ ] `npx ts-node todo.ts add "Buy milk"` adds a todo and confirms
+2. [ ] `npx ts-node todo.ts list` shows all todos with IDs and status
+3. [ ] `npx ts-node todo.ts done 1` marks todo 1 as complete
+4. [ ] Todos survive script restart (JSON persistence)
+5. [ ] Invalid commands show helpful usage message
+6. [ ] Code has proper TypeScript types (no `any`)
+
+## Example Output
+
+```
+$ npx ts-node todo.ts add "Buy milk"
+✓ Added: "Buy milk" (id: 1)
+
+$ npx ts-node todo.ts list
+1. [ ] Buy milk
+
+$ npx ts-node todo.ts done 1
+✓ Completed: "Buy milk"
+```
+
+---
+
+## Ralph Instructions
+
+1. Work on the next incomplete criterion (marked [ ])
+2. Check off completed criteria (change [ ] to [x])
+3. Run tests after changes
+4. Commit your changes frequently
+5. When ALL criteria are [x], output: `<ralph>COMPLETE</ralph>`
+6. If stuck on the same issue 3+ times, output: `<ralph>GUTTER</ralph>`
+TASKEOF
+  echo "✓ Created RALPH_TASK.md with example task"
+else
+  echo "✓ RALPH_TASK.md already exists (not overwritten)"
+fi
+
+# =============================================================================
+# UPDATE .gitignore
+# =============================================================================
+
+if [[ -f ".gitignore" ]]; then
+  if ! grep -q "ralph-config.json" .gitignore 2>/dev/null; then
+    echo "" >> .gitignore
+    echo "# Ralph config (may contain API key)" >> .gitignore
+    echo ".cursor/ralph-config.json" >> .gitignore
+  fi
+else
+  cat > .gitignore <<'EOF'
+# Ralph config (may contain API key)
+.cursor/ralph-config.json
+EOF
+fi
+echo "✓ Updated .gitignore"
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════"
+echo "✅ Ralph installed!"
+echo "═══════════════════════════════════════════════════════════════════"
+echo ""
+echo "Files created:"
+echo ""
+echo "  📁 .cursor/ralph-scripts/"
+echo "     ├── ralph-setup.sh          - Main entry (interactive)"
+echo "     ├── ralph-loop.sh           - CLI mode (for scripting)"
+echo "     ├── ralph-once.sh           - Single iteration (testing)"
+echo "     └── ...                     - Other utilities"
+echo ""
+echo "  📁 .ralph/                     - State files (tracked in git)"
+echo "     ├── guardrails.md           - Lessons learned"
+echo "     ├── progress.md             - Progress log"
+echo "     ├── activity.log            - Tool call log"
+echo "     └── errors.log              - Failure log"
+echo ""
+echo "  📄 RALPH_TASK.md               - Your task definition (edit this!)"
+echo ""
+echo "Next steps:"
+echo "  1. Edit RALPH_TASK.md to define your actual task"
+echo "  2. Run: ./.cursor/ralph-scripts/ralph-setup.sh"
+echo ""
+echo "Alternative commands:"
+echo "  • ralph-once.sh    - Test with single iteration first"
+echo "  • ralph-loop.sh    - CLI mode with flags (for scripting)"
+echo ""
+echo "Monitor progress:"
+echo "  tail -f .ralph/activity.log"
+echo ""
+echo "Learn more: https://ghuntley.com/ralph/"
+echo "═══════════════════════════════════════════════════════════════════"
+</file>
+
+<file path="README.md">
+# Ralph Wiggum for Cursor
+
+An implementation of [Geoffrey Huntley's Ralph Wiggum technique](https://ghuntley.com/ralph/) for Cursor, enabling autonomous AI development with deliberate context management.
+
+> "That's the beauty of Ralph - the technique is deterministically bad in an undeterministic world."
+
+## What is Ralph?
+
+Ralph is a technique for autonomous AI development that treats LLM context like memory:
+
+```bash
+while :; do cat PROMPT.md | agent ; done
+```
+
+The same prompt is fed repeatedly to an AI agent. Progress persists in **files and git**, not in the LLM's context window. When context fills up, you get a fresh agent with fresh context.
+
+### The malloc/free Problem
+
+In traditional programming:
+- `malloc()` allocates memory
+- `free()` releases memory
+
+In LLM context:
+- Reading files, tool outputs, conversation = `malloc()`
+- **There is no `free()`** - context cannot be selectively released
+- Only way to free: start a new conversation
+
+This creates two problems:
+
+1. **Context pollution** - Failed attempts, unrelated code, and mixed concerns accumulate and confuse the model
+2. **The gutter** - Once polluted, the model keeps referencing bad context. Like a bowling ball in the gutter, there's no saving it.
+
+**Ralph's solution:** Deliberately rotate to fresh context before pollution builds up. State lives in files and git, not in the LLM's memory.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      ralph-setup.sh                          │
+│                           │                                  │
+│              ┌────────────┴────────────┐                    │
+│              ▼                         ▼                    │
+│         [gum UI]                  [fallback]                │
+│     Model selection            Simple prompts               │
+│     Max iterations                                          │
+│     Options (branch, PR)                                    │
+│              │                         │                    │
+│              └────────────┬────────────┘                    │
+│                           ▼                                  │
+│    cursor-agent -p --force --output-format stream-json       │
+│                           │                                  │
+│                           ▼                                  │
+│                   stream-parser.sh                           │
+│                      │        │                              │
+│     ┌────────────────┴────────┴────────────────┐            │
+│     ▼                                           ▼            │
+│  .ralph/                                    Signals          │
+│  ├── activity.log  (tool calls)            ├── WARN at 70k  │
+│  ├── errors.log    (failures)              ├── ROTATE at 80k│
+│  ├── progress.md   (agent writes)          ├── COMPLETE     │
+│  └── guardrails.md (lessons learned)       └── GUTTER       │
+│                                                              │
+│  When ROTATE → fresh context, continue from git             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key features:**
+- **Interactive setup** - Beautiful gum-based UI for model selection and options
+- **Accurate token tracking** - Parser counts actual bytes from every file read/write
+- **Gutter detection** - Detects when agent is stuck (same command failed 3x, file thrashing)
+- **Learning from failures** - Agent updates `.ralph/guardrails.md` with lessons
+- **State in git** - Commits frequently so next agent picks up from git history
+- **Branch/PR workflow** - Optionally work on a branch and open PR when complete
+
+## Prerequisites
+
+| Requirement | Check | How to Set Up |
+|-------------|-------|---------------|
+| **Git repo** | `git status` works | `git init` |
+| **cursor-agent CLI** | `which cursor-agent` | `curl https://cursor.com/install -fsS \| bash` |
+| **gum** (optional) | `which gum` | Installer offers to install, or `brew install gum` |
+
+## Quick Start
+
+### 1. Install Ralph
+
+```bash
+cd your-project
+curl -fsSL https://raw.githubusercontent.com/agrimsingh/ralph-wiggum-cursor/main/install.sh | bash
+```
+
+This creates:
+```
+your-project/
+├── .cursor/ralph-scripts/      # Ralph scripts
+│   ├── ralph-setup.sh          # Main entry point (interactive)
+│   ├── ralph-loop.sh           # CLI mode (for scripting)
+│   ├── ralph-once.sh           # Single iteration (testing)
+│   ├── stream-parser.sh        # Token tracking
+│   ├── ralph-common.sh         # Shared functions
+│   └── init-ralph.sh           # Re-initialize if needed
+├── .ralph/                     # State files (tracked in git)
+│   ├── progress.md             # Agent updates: what's done
+│   ├── guardrails.md           # Lessons learned (Signs)
+│   ├── activity.log            # Tool call log (parser writes)
+│   └── errors.log              # Failure log (parser writes)
+└── RALPH_TASK.md               # Your task definition
+```
+
+### 2. (Optional) gum for Enhanced UI
+
+The installer will offer to install gum automatically. You can also:
+- Skip the prompt and auto-install: `curl ... | INSTALL_GUM=1 bash`
+- Install manually: `brew install gum` (macOS) or see [gum installation](https://github.com/charmbracelet/gum#installation)
+
+With gum, you get a beautiful interactive menu for selecting models and options:
+
+```
+? Select model:
+  ◉ opus-4.5-thinking
+  ◯ sonnet-4.5-thinking
+  ◯ gpt-5.2-high
+  ◯ composer-1
+  ◯ Custom...
+
+? Max iterations: 20
+
+? Options:
+  ◯ Commit to current branch
+  ◯ Run single iteration first
+  ◯ Work on new branch
+  ◯ Open PR when complete
+```
+
+Without gum, Ralph falls back to simple numbered prompts.
+
+### 3. Define Your Task
+
+Edit `RALPH_TASK.md`:
+
+```markdown
+---
+task: Build a REST API
+test_command: "npm test"
+---
+
+# Task: REST API
+
+Build a REST API with user management.
+
+## Success Criteria
+
+1. [ ] GET /health returns 200
+2. [ ] POST /users creates a user  
+3. [ ] GET /users/:id returns user
+4. [ ] All tests pass
+
+## Context
+
+- Use Express.js
+- Store users in memory (no database needed)
+```
+
+**Important:** Use `[ ]` checkboxes. Ralph tracks completion by counting unchecked boxes.
+
+### 4. Start the Loop
+
+```bash
+./.cursor/ralph-scripts/ralph-setup.sh
+```
+
+Ralph will:
+1. Show interactive UI for model and options (or simple prompts if gum not installed)
+2. Run `cursor-agent` with your task
+3. Parse output in real-time, tracking token usage
+4. At 70k tokens: warn agent to wrap up current work
+5. At 80k tokens: rotate to fresh context
+6. Repeat until all `[ ]` are `[x]` (or max iterations reached)
+
+### 5. Monitor Progress
+
+```bash
+# Watch activity in real-time
+tail -f .ralph/activity.log
+
+# Example output:
+# [12:34:56] 🟢 READ src/index.ts (245 lines, ~24.5KB)
+# [12:34:58] 🟢 WRITE src/routes/users.ts (50 lines, 2.1KB)
+# [12:35:01] 🟢 SHELL npm test → exit 0
+# [12:35:10] 🟢 TOKENS: 45,230 / 80,000 (56%) [read:30KB write:5KB assist:10KB shell:0KB]
+
+# Check for failures
+cat .ralph/errors.log
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `ralph-setup.sh` | **Primary** - Interactive setup + run loop |
+| `ralph-once.sh` | Test single iteration before going AFK |
+| `ralph-loop.sh` | CLI mode for scripting (see flags below) |
+| `init-ralph.sh` | Re-initialize Ralph state |
+
+### ralph-loop.sh Flags (for scripting/CI)
+
+```bash
+./ralph-loop.sh [options] [workspace]
+
+Options:
+  -n, --iterations N     Max iterations (default: 20)
+  -m, --model MODEL      Model to use (default: opus-4.5-thinking)
+  --branch NAME          Create and work on a new branch
+  --pr                   Open PR when complete (requires --branch)
+  -y, --yes              Skip confirmation prompt
+```
+
+**Examples:**
+
+```bash
+# Scripted PR workflow
+./ralph-loop.sh --branch feature/api --pr -y
+
+# Use a different model with more iterations
+./ralph-loop.sh -n 50 -m gpt-5.2-high
+```
+
+## How It Works
+
+### The Loop
+
+```
+Iteration 1                    Iteration 2                    Iteration N
+┌──────────────────┐          ┌──────────────────┐          ┌──────────────────┐
+│ Fresh context    │          │ Fresh context    │          │ Fresh context    │
+│       │          │          │       │          │          │       │          │
+│       ▼          │          │       ▼          │          │       ▼          │
+│ Read RALPH_TASK  │          │ Read RALPH_TASK  │          │ Read RALPH_TASK  │
+│ Read guardrails  │──────────│ Read guardrails  │──────────│ Read guardrails  │
+│ Read progress    │  (state  │ Read progress    │  (state  │ Read progress    │
+│       │          │  in git) │       │          │  in git) │       │          │
+│       ▼          │          │       ▼          │          │       ▼          │
+│ Work on criteria │          │ Work on criteria │          │ Work on criteria │
+│ Commit to git    │          │ Commit to git    │          │ Commit to git    │
+│       │          │          │       │          │          │       │          │
+│       ▼          │          │       ▼          │          │       ▼          │
+│ 80k tokens       │          │ 80k tokens       │          │ All [x] done!    │
+│ ROTATE ──────────┼──────────┼──────────────────┼──────────┼──► COMPLETE      │
+└──────────────────┘          └──────────────────┘          └──────────────────┘
+```
+
+Each iteration:
+1. Reads task and state from files (not from previous context)
+2. Works on unchecked criteria
+3. Commits progress to git
+4. Updates `.ralph/progress.md` and `.ralph/guardrails.md`
+5. Rotates when context is full
+
+### Git Protocol
+
+The agent is instructed to commit frequently:
+
+```bash
+# After each criterion
+git add -A && git commit -m 'ralph: [criterion] - description'
+
+# Push periodically
+git push
+```
+
+**Commits are the agent's memory.** The next iteration picks up from git history.
+
+### The Learning Loop (Signs)
+
+When something fails, the agent adds a "Sign" to `.ralph/guardrails.md`:
+
+```markdown
+### Sign: Check imports before adding
+- **Trigger**: Adding a new import statement
+- **Instruction**: First check if import already exists in file
+- **Added after**: Iteration 3 - duplicate import caused build failure
+```
+
+Future iterations read guardrails first and follow them, preventing repeated mistakes.
+
+```
+Error occurs → errors.log → Agent analyzes → Updates guardrails.md → Future agents follow
+```
+
+## Context Health Indicators
+
+The activity log shows context health with emoji:
+
+| Emoji | Status | Token % | Meaning |
+|-------|--------|---------|---------|
+| 🟢 | Healthy | < 60% | Plenty of room |
+| 🟡 | Warning | 60-80% | Approaching limit |
+| 🔴 | Critical | > 80% | Rotation imminent |
+
+Example:
+```
+[12:34:56] 🟢 READ src/index.ts (245 lines, ~24.5KB)
+[12:40:22] 🟡 TOKENS: 58,000 / 80,000 (72%) - approaching limit [read:40KB write:8KB assist:10KB shell:0KB]
+[12:45:33] 🔴 TOKENS: 72,500 / 80,000 (90%) - rotation imminent
+```
+
+## Gutter Detection
+
+The parser detects when the agent is stuck:
+
+| Pattern | Trigger | What Happens |
+|---------|---------|--------------|
+| Repeated failure | Same command failed 3x | GUTTER signal |
+| File thrashing | Same file written 5x in 10 min | GUTTER signal |
+| Agent signals | Agent outputs `<ralph>GUTTER</ralph>` | GUTTER signal |
+
+When gutter is detected:
+1. Check `.ralph/errors.log` for the pattern
+2. Fix the issue manually or add a guardrail
+3. Re-run the loop
+
+## Completion Detection
+
+Ralph detects completion in two ways:
+
+1. **Checkbox check**: All `[ ]` in RALPH_TASK.md changed to `[x]`
+2. **Agent sigil**: Agent outputs `<ralph>COMPLETE</ralph>`
+
+Both are verified before declaring success.
+
+## File Reference
+
+| File | Purpose | Who Uses It |
+|------|---------|-------------|
+| `RALPH_TASK.md` | Task definition + success criteria | You define, agent reads |
+| `.ralph/progress.md` | What's been accomplished | Agent writes after work |
+| `.ralph/guardrails.md` | Lessons learned (Signs) | Agent reads first, writes after failures |
+| `.ralph/activity.log` | Tool call log with token counts | Parser writes, you monitor |
+| `.ralph/errors.log` | Failures + gutter detection | Parser writes, agent reads |
+| `.ralph/.iteration` | Current iteration number | Parser reads/writes |
+
+## Configuration
+
+Configuration is set via command-line flags or environment variables:
+
+```bash
+# Via flags (recommended)
+./ralph-loop.sh -n 50 -m gpt-5.2-high
+
+# Via environment
+RALPH_MODEL=gpt-5.2-high MAX_ITERATIONS=50 ./ralph-loop.sh
+```
+
+Default thresholds in `ralph-common.sh`:
+
+```bash
+MAX_ITERATIONS=20       # Max rotations before giving up
+WARN_THRESHOLD=70000    # Tokens: send wrapup warning
+ROTATE_THRESHOLD=80000  # Tokens: force rotation
+```
+
+## Troubleshooting
+
+### "cursor-agent CLI not found"
+
+```bash
+curl https://cursor.com/install -fsS | bash
+```
+
+### Agent keeps failing on same thing
+
+Check `.ralph/errors.log` for the pattern. Either:
+1. Fix the underlying issue manually
+2. Add a guardrail to `.ralph/guardrails.md` explaining what to do differently
+
+### Context rotates too frequently
+
+The agent might be reading too many large files. Check `activity.log` for large READs and consider:
+1. Adding a guardrail: "Don't read the entire file, use grep to find relevant sections"
+2. Breaking the task into smaller pieces
+
+### Task never completes
+
+Check if criteria are too vague. Each criterion should be:
+- Specific and testable
+- Achievable in a single iteration
+- Not dependent on manual steps
+
+## Workflows
+
+### Basic (default)
+
+```bash
+./ralph-setup.sh  # Interactive setup → runs loop → done
+```
+
+### Human-in-the-loop (recommended for new tasks)
+
+```bash
+./ralph-once.sh   # Run ONE iteration
+# Review changes...
+./ralph-setup.sh  # Continue with full loop
+```
+
+### Scripted/CI
+
+```bash
+./ralph-loop.sh --branch feature/foo --pr -y
+```
+
+## Learn More
+
+- [Original Ralph technique](https://ghuntley.com/ralph/) - Geoffrey Huntley
+- [Context as memory](https://ghuntley.com/allocations/) - The malloc/free metaphor
+- [Cursor CLI docs](https://cursor.com/docs/cli/headless)
+- [gum - A tool for glamorous shell scripts](https://github.com/charmbracelet/gum)
+
+## Credits
+
+- **Original technique**: [Geoffrey Huntley](https://ghuntley.com/ralph/) - the Ralph Wiggum methodology
+- **Cursor port**: [Agrim Singh](https://x.com/agrimsingh) - this implementation
+
+## License
+
+MIT
+</file>
+
+<file path="references/CONTEXT_ENGINEERING.md">
+# Context Engineering Reference
+
+This document explains the malloc/free metaphor for LLM context management that underlies the Ralph technique.
+
+## The malloc() Metaphor
+
+In traditional programming:
+- `malloc()` allocates memory
+- `free()` releases memory
+- Memory leaks occur when you allocate without freeing
+
+In LLM context:
+- Reading files, receiving responses, tool outputs = `malloc()`
+- **There is no `free()`** - context cannot be released
+- The only way to "free" is to start a new conversation
+
+## Why This Matters
+
+### Context Pollution
+
+When you work on multiple unrelated tasks in the same context:
+
+```
+Task 1: Build authentication → context contains auth code, JWT docs, security patterns
+Task 2: Build UI components → context now ALSO contains auth stuff
+
+Result: LLM might suggest auth-related patterns when building UI
+        or mix concerns inappropriately
+```
+
+### Autoregressive Failure
+
+LLMs predict the next token based on ALL context. When context contains:
+- Unrelated information
+- Failed attempts
+- Mixed concerns
+
+The model can "spiral" into wrong territory, generating increasingly off-base responses.
+
+### The Gutter Metaphor
+
+> "If the bowling ball is in the gutter, there's no saving it."
+
+Once context is polluted with failed attempts or mixed concerns, the model will keep referencing that pollution. Starting fresh is often faster than trying to correct course.
+
+## Context Health Indicators
+
+### 🟢 Healthy Context
+- Single focused task
+- Relevant files only
+- Clear progress
+- Under 60% capacity
+
+### 🟡 Warning Signs
+- Multiple unrelated topics discussed
+- Several failed attempts in history
+- Approaching 80% capacity
+- Repeated similar errors
+
+### 🔴 Critical / Gutter
+- Mixed concerns throughout
+- Circular failure patterns
+- Over 90% capacity
+- Model suggesting irrelevant solutions
+
+## Best Practices
+
+### 1. One Task Per Context
+
+Don't ask "fix the auth bug AND add the new feature". Do them in separate conversations.
+
+### 2. Fresh Start on Topic Change
+
+Finished auth? Start a new conversation for the next feature.
+
+### 3. Don't Redline
+
+Stay under 80% of context capacity. Quality degrades as you approach limits.
+
+### 4. Recognize the Gutter
+
+If you're seeing:
+- Same error 3+ times
+- Solutions that don't match the problem
+- Circular suggestions
+
+Start fresh. Your progress is in the files.
+
+### 5. State in Files, Not Context
+
+Write progress to files. The next conversation can read them. Context is ephemeral; files are permanent.
+
+## Ralph's Approach
+
+The original Ralph technique (`while :; do cat PROMPT.md | agent ; done`) naturally implements these principles:
+
+1. **Each iteration is a fresh process** - Context is freed
+2. **State persists in files** - Progress survives context resets
+3. **Same prompt each time** - Focused, single-task context
+4. **Failures inform guardrails** - Learning without context pollution
+
+This Cursor implementation aims to bring these benefits while working within Cursor's session model.
+
+## Measuring Context
+
+Rough estimates:
+- 1 token ≈ 4 characters
+- Average code file: 500-2000 tokens
+- Large file: 5000+ tokens
+- Conversation history: 100-500 tokens per exchange
+
+Track allocations in `.ralph/context-log.md` to stay aware.
+
+## When to Start Fresh
+
+**Definitely start fresh when:**
+- Switching to unrelated task
+- Context over 90% full
+- Same error 3+ times
+- Model suggestions are off-topic
+
+**Consider starting fresh when:**
+- Context over 70% full
+- Significant topic shift within task
+- Feeling "stuck"
+- Multiple failed approaches in history
+</file>
+
+<file path="references/GUARDRAILS.md">
+# Guardrails Reference ("Signs")
+
+This document explains how to create and use guardrails in Ralph.
+
+## The Signs Metaphor
+
+From Geoffrey Huntley:
+
+> "Ralph is very good at making playgrounds, but he comes home bruised because he fell off the slide, so one then tunes Ralph by adding a sign next to the slide saying 'SLIDE DOWN, DON'T JUMP, LOOK AROUND,' and Ralph is more likely to look and see the sign."
+
+Signs are explicit instructions added to prevent known failure modes.
+
+## Anatomy of a Sign
+
+```markdown
+### Sign: [Descriptive Name]
+- **Trigger**: When this situation occurs
+- **Instruction**: What to do instead
+- **Added after**: When/why this was added
+- **Example**: Concrete example if helpful
+```
+
+## Types of Signs
+
+### 1. Preventive Signs
+
+Stop problems before they happen:
+
+```markdown
+### Sign: Validate Before Trust
+- **Trigger**: When receiving external input
+- **Instruction**: Always validate and sanitize input before using it
+- **Added after**: Iteration 3 - SQL injection vulnerability
+```
+
+### 2. Corrective Signs
+
+Fix recurring mistakes:
+
+```markdown
+### Sign: Check Return Values
+- **Trigger**: When calling functions that can fail
+- **Instruction**: Always check return values and handle errors
+- **Added after**: Iteration 7 - Null pointer exception
+```
+
+### 3. Process Signs
+
+Enforce good practices:
+
+```markdown
+### Sign: Test Before Commit
+- **Trigger**: Before committing changes
+- **Instruction**: Run the test suite and ensure all tests pass
+- **Added after**: Iteration 2 - Broken tests committed
+```
+
+### 4. Architecture Signs
+
+Guide design decisions:
+
+```markdown
+### Sign: Single Responsibility
+- **Trigger**: When a function grows beyond 50 lines
+- **Instruction**: Consider splitting into smaller, focused functions
+- **Added after**: Iteration 12 - Unmaintainable god function
+```
+
+## When to Add Signs
+
+Add a sign when:
+
+1. **The same mistake happens twice** - Once is learning, twice is a pattern
+2. **A subtle bug is found** - Prevent future occurrences
+3. **A best practice is violated** - Reinforce good habits
+4. **Context-specific knowledge is needed** - Project-specific conventions
+
+## Sign Lifecycle
+
+### Creation
+
+```markdown
+### Sign: [New Sign]
+- **Trigger**: [When it applies]
+- **Instruction**: [What to do]
+- **Added after**: Iteration N - [What happened]
+```
+
+### Refinement
+
+If a sign isn't working:
+- Make the trigger more specific
+- Make the instruction clearer
+- Add examples
+
+### Retirement
+
+Signs can be removed when:
+- The underlying issue is fixed at a deeper level
+- The sign is no longer relevant
+- The sign is causing more problems than it solves
+
+## Example Signs Library
+
+### Security
+
+```markdown
+### Sign: Sanitize All Input
+- **Trigger**: Any user-provided data
+- **Instruction**: Use parameterized queries, escape HTML, validate types
+- **Example**: `db.query("SELECT * FROM users WHERE id = ?", [userId])`
+```
+
+### Error Handling
+
+```markdown
+### Sign: Graceful Degradation
+- **Trigger**: External service calls
+- **Instruction**: Always have a fallback for when services are unavailable
+- **Example**: Cache results, provide default values, show friendly errors
+```
+
+### Testing
+
+```markdown
+### Sign: Test the Unhappy Path
+- **Trigger**: Writing tests for new functionality
+- **Instruction**: Include tests for error cases, edge cases, and invalid input
+```
+
+### Code Quality
+
+```markdown
+### Sign: Explain Why, Not What
+- **Trigger**: Writing comments
+- **Instruction**: Comments should explain reasoning, not describe obvious code
+- **Example**: `// Using retry because API is flaky under load` not `// Call the API`
+```
+
+## Automatic Sign Detection
+
+The Ralph hooks can automatically detect some patterns and suggest signs:
+
+- **Thrashing**: Same file edited many times → "Step back and reconsider"
+- **Repeated errors**: Same test failing → "Check the test assumptions"
+- **Large changes**: Big diffs → "Consider smaller increments"
+
+These are logged in `.ralph/failures.md` and can be promoted to guardrails.
+
+## Using Signs Effectively
+
+### Do
+
+- Keep signs concise and actionable
+- Include concrete examples
+- Update signs when they're not working
+- Remove outdated signs
+
+### Don't
+
+- Add signs for every minor issue
+- Make signs too vague ("be careful")
+- Ignore signs that keep triggering
+- Let the guardrails file become overwhelming
+
+## Integration with Ralph
+
+Signs are:
+1. Stored in `.ralph/guardrails.md`
+2. Injected into context at the start of each iteration
+3. Referenced when relevant situations arise
+4. Updated based on observed failures
+
+The goal is a self-improving system where each failure makes future iterations smarter.
+</file>
+
+<file path="scripts/init-ralph.sh">
+#!/bin/bash
+# Ralph Wiggum: Initialize Ralph in a project
+# Sets up Ralph tracking for CLI mode
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+
+echo "═══════════════════════════════════════════════════════════════════"
+echo "🐛 Ralph Wiggum Initialization"
+echo "═══════════════════════════════════════════════════════════════════"
+echo ""
+
+# Check if we're in a git repo
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+  echo "⚠️  Warning: Not in a git repository."
+  echo "   Ralph works best with git for state persistence."
+  echo ""
+  read -p "Continue anyway? [y/N] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
+fi
+
+# Check for cursor-agent CLI
+if ! command -v cursor-agent &> /dev/null; then
+  echo "⚠️  Warning: cursor-agent CLI not found."
+  echo "   Install via: curl https://cursor.com/install -fsS | bash"
+  echo ""
+fi
+
+# Create directories
+mkdir -p .ralph
+mkdir -p .cursor/ralph-scripts
+
+# =============================================================================
+# CREATE RALPH_TASK.md IF NOT EXISTS
+# =============================================================================
+
+if [[ ! -f "RALPH_TASK.md" ]]; then
+  echo "📝 Creating RALPH_TASK.md template..."
+  if [[ -f "$SKILL_DIR/assets/RALPH_TASK_TEMPLATE.md" ]]; then
+    cp "$SKILL_DIR/assets/RALPH_TASK_TEMPLATE.md" RALPH_TASK.md
+  else
+    cat > RALPH_TASK.md << 'EOF'
+---
+task: Your task description here
+test_command: "npm test"
+---
+
+# Task
+
+Describe what you want to accomplish.
+
+## Success Criteria
+
+1. [ ] First thing to complete
+2. [ ] Second thing to complete
+3. [ ] Third thing to complete
+
+## Context
+
+Any additional context the agent should know.
+EOF
+  fi
+  echo "   Edit RALPH_TASK.md to define your task."
+else
+  echo "✓ RALPH_TASK.md already exists"
+fi
+
+# =============================================================================
+# INITIALIZE STATE FILES
+# =============================================================================
+
+echo "📁 Initializing .ralph/ directory..."
+
+cat > .ralph/guardrails.md << 'EOF'
+# Ralph Guardrails (Signs)
+
+> Lessons learned from past failures. READ THESE BEFORE ACTING.
+
+## Core Signs
+
+### Sign: Read Before Writing
+- **Trigger**: Before modifying any file
+- **Instruction**: Always read the existing file first
+- **Added after**: Core principle
+
+### Sign: Test After Changes
+- **Trigger**: After any code change
+- **Instruction**: Run tests to verify nothing broke
+- **Added after**: Core principle
+
+### Sign: Commit Checkpoints
+- **Trigger**: Before risky changes
+- **Instruction**: Commit current working state first
+- **Added after**: Core principle
+
+---
+
+## Learned Signs
+
+(Signs added from observed failures will appear below)
+
+EOF
+
+cat > .ralph/progress.md << 'EOF'
+# Progress Log
+
+> Updated by the agent after significant work.
+
+## Summary
+
+- Iterations completed: 0
+- Current status: Initialized
+
+## How This Works
+
+Progress is tracked in THIS FILE, not in LLM context.
+When context is rotated (fresh agent), the new agent reads this file.
+This is how Ralph maintains continuity across iterations.
+
+## Session History
+
+EOF
+
+cat > .ralph/errors.log << 'EOF'
+# Error Log
+
+> Failures detected by stream-parser. Use to update guardrails.
+
+EOF
+
+cat > .ralph/activity.log << 'EOF'
+# Activity Log
+
+> Real-time tool call logging from stream-parser.
+
+EOF
+
+echo "0" > .ralph/.iteration
+
+# =============================================================================
+# INSTALL SCRIPTS
+# =============================================================================
+
+echo "📦 Installing scripts..."
+
+# Copy scripts
+cp "$SKILL_DIR/scripts/"*.sh .cursor/ralph-scripts/ 2>/dev/null || true
+chmod +x .cursor/ralph-scripts/*.sh 2>/dev/null || true
+
+echo "✓ Scripts installed to .cursor/ralph-scripts/"
+
+# =============================================================================
+# UPDATE .gitignore
+# =============================================================================
+
+if [[ -f ".gitignore" ]]; then
+  # Don't gitignore .ralph/ - we want it tracked for state persistence
+  if ! grep -q "ralph-config.json" .gitignore; then
+    echo "" >> .gitignore
+    echo "# Ralph config (may contain API keys)" >> .gitignore
+    echo ".cursor/ralph-config.json" >> .gitignore
+  fi
+  echo "✓ Updated .gitignore"
+else
+  cat > .gitignore << 'EOF'
+# Ralph config (may contain API keys)
+.cursor/ralph-config.json
+EOF
+  echo "✓ Created .gitignore"
+fi
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+
+echo ""
+echo "═══════════════════════════════════════════════════════════════════"
+echo "✅ Ralph initialized!"
+echo "═══════════════════════════════════════════════════════════════════"
+echo ""
+echo "Files created:"
+echo "  • RALPH_TASK.md        - Define your task here"
+echo "  • .ralph/guardrails.md - Lessons learned (agent updates this)"
+echo "  • .ralph/progress.md   - Progress log (agent updates this)"
+echo "  • .ralph/activity.log  - Tool call log (parser updates this)"
+echo "  • .ralph/errors.log    - Failure log (parser updates this)"
+echo ""
+echo "Next steps:"
+echo "  1. Edit RALPH_TASK.md to define your task and criteria"
+echo "  2. Run: ./scripts/ralph-loop.sh"
+echo "     (or: .cursor/ralph-scripts/ralph-loop.sh)"
+echo ""
+echo "The agent will work autonomously, rotating context as needed."
+echo "Monitor progress: tail -f .ralph/activity.log"
+echo ""
+echo "Learn more: https://ghuntley.com/ralph/"
+echo "═══════════════════════════════════════════════════════════════════"
+</file>
+
+<file path="scripts/ralph-common.sh">
+#!/bin/bash
+# Ralph Wiggum: Common utilities and loop logic
+#
+# Shared functions for ralph-loop.sh and ralph-setup.sh
+# All state lives in .ralph/ within the project.
+
+# =============================================================================
+# CONFIGURATION (can be overridden before sourcing)
+# =============================================================================
+
+# Token thresholds
+WARN_THRESHOLD="${WARN_THRESHOLD:-70000}"
+ROTATE_THRESHOLD="${ROTATE_THRESHOLD:-80000}"
+
+# Iteration limits
+MAX_ITERATIONS="${MAX_ITERATIONS:-20}"
+
+# Model selection
+DEFAULT_MODEL="opus-4.5-thinking"
+MODEL="${RALPH_MODEL:-$DEFAULT_MODEL}"
+
+# Feature flags (set by caller)
+USE_BRANCH="${USE_BRANCH:-}"
+OPEN_PR="${OPEN_PR:-false}"
+SKIP_CONFIRM="${SKIP_CONFIRM:-false}"
+
+# =============================================================================
+# BASIC HELPERS
+# =============================================================================
+
+# Cross-platform sed -i
+sedi() {
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "$@"
+  else
+    sed -i "$@"
+  fi
+}
+
+# Get the .ralph directory for a workspace
+get_ralph_dir() {
+  local workspace="${1:-.}"
+  echo "$workspace/.ralph"
+}
+
+# Get current iteration from .ralph/.iteration
+get_iteration() {
+  local workspace="${1:-.}"
+  local state_file="$workspace/.ralph/.iteration"
+  
+  if [[ -f "$state_file" ]]; then
+    cat "$state_file"
+  else
+    echo "0"
+  fi
+}
+
+# Set iteration number
+set_iteration() {
+  local workspace="${1:-.}"
+  local iteration="$2"
+  local ralph_dir="$workspace/.ralph"
+  
+  mkdir -p "$ralph_dir"
+  echo "$iteration" > "$ralph_dir/.iteration"
+}
+
+# Increment iteration and return new value
+increment_iteration() {
+  local workspace="${1:-.}"
+  local current=$(get_iteration "$workspace")
+  local next=$((current + 1))
+  set_iteration "$workspace" "$next"
+  echo "$next"
+}
+
+# Get context health emoji based on token count
+get_health_emoji() {
+  local tokens="$1"
+  local pct=$((tokens * 100 / ROTATE_THRESHOLD))
+  
+  if [[ $pct -lt 60 ]]; then
+    echo "🟢"
+  elif [[ $pct -lt 80 ]]; then
+    echo "🟡"
+  else
+    echo "🔴"
+  fi
+}
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+
+# Log a message to activity.log
+log_activity() {
+  local workspace="${1:-.}"
+  local message="$2"
+  local ralph_dir="$workspace/.ralph"
+  local timestamp=$(date '+%H:%M:%S')
+  
+  mkdir -p "$ralph_dir"
+  echo "[$timestamp] $message" >> "$ralph_dir/activity.log"
+}
+
+# Log an error to errors.log
+log_error() {
+  local workspace="${1:-.}"
+  local message="$2"
+  local ralph_dir="$workspace/.ralph"
+  local timestamp=$(date '+%H:%M:%S')
+  
+  mkdir -p "$ralph_dir"
+  echo "[$timestamp] $message" >> "$ralph_dir/errors.log"
+}
+
+# Log to progress.md (called by the loop, not the agent)
+log_progress() {
+  local workspace="$1"
+  local message="$2"
+  local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+  local progress_file="$workspace/.ralph/progress.md"
+  
+  echo "" >> "$progress_file"
+  echo "### $timestamp" >> "$progress_file"
+  echo "$message" >> "$progress_file"
+}
+
+# =============================================================================
+# INITIALIZATION
+# =============================================================================
+
+# Initialize .ralph directory with default files
+init_ralph_dir() {
+  local workspace="$1"
+  local ralph_dir="$workspace/.ralph"
+  
+  mkdir -p "$ralph_dir"
+  
+  # Initialize progress.md if it doesn't exist
+  if [[ ! -f "$ralph_dir/progress.md" ]]; then
+    cat > "$ralph_dir/progress.md" << 'EOF'
+# Progress Log
+
+> Updated by the agent after significant work.
+
+---
+
+## Session History
+
+EOF
+  fi
+  
+  # Initialize guardrails.md if it doesn't exist
+  if [[ ! -f "$ralph_dir/guardrails.md" ]]; then
+    cat > "$ralph_dir/guardrails.md" << 'EOF'
+# Ralph Guardrails (Signs)
+
+> Lessons learned from past failures. READ THESE BEFORE ACTING.
+
+## Core Signs
+
+### Sign: Read Before Writing
+- **Trigger**: Before modifying any file
+- **Instruction**: Always read the existing file first
+- **Added after**: Core principle
+
+### Sign: Test After Changes
+- **Trigger**: After any code change
+- **Instruction**: Run tests to verify nothing broke
+- **Added after**: Core principle
+
+### Sign: Commit Checkpoints
+- **Trigger**: Before risky changes
+- **Instruction**: Commit current working state first
+- **Added after**: Core principle
+
+---
+
+## Learned Signs
+
+EOF
+  fi
+  
+  # Initialize errors.log if it doesn't exist
+  if [[ ! -f "$ralph_dir/errors.log" ]]; then
+    cat > "$ralph_dir/errors.log" << 'EOF'
+# Error Log
+
+> Failures detected by stream-parser. Use to update guardrails.
+
+EOF
+  fi
+  
+  # Initialize activity.log if it doesn't exist
+  if [[ ! -f "$ralph_dir/activity.log" ]]; then
+    cat > "$ralph_dir/activity.log" << 'EOF'
+# Activity Log
+
+> Real-time tool call logging from stream-parser.
+
+EOF
+  fi
+}
+
+# =============================================================================
+# TASK MANAGEMENT
+# =============================================================================
+
+# Check if task is complete
+check_task_complete() {
+  local workspace="$1"
+  local task_file="$workspace/RALPH_TASK.md"
+  
+  if [[ ! -f "$task_file" ]]; then
+    echo "NO_TASK_FILE"
+    return
+  fi
+  
+  # Only count actual checkbox list items, not [ ] in prose/examples
+  # Matches: "- [ ]", "* [ ]", "1. [ ]", etc.
+  local unchecked
+  unchecked=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[ \]' "$task_file" 2>/dev/null) || unchecked=0
+  
+  if [[ "$unchecked" -eq 0 ]]; then
+    echo "COMPLETE"
+  else
+    echo "INCOMPLETE:$unchecked"
+  fi
+}
+
+# Count task criteria (returns done:total)
+count_criteria() {
+  local workspace="${1:-.}"
+  local task_file="$workspace/RALPH_TASK.md"
+  
+  if [[ ! -f "$task_file" ]]; then
+    echo "0:0"
+    return
+  fi
+  
+  # Only count actual checkbox list items, not [x] or [ ] in prose/examples
+  # Matches: "- [ ]", "* [x]", "1. [ ]", etc.
+  local total done_count
+  total=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[(x| )\]' "$task_file" 2>/dev/null) || total=0
+  done_count=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[x\]' "$task_file" 2>/dev/null) || done_count=0
+  
+  echo "$done_count:$total"
+}
+
+# =============================================================================
+# PROMPT BUILDING
+# =============================================================================
+
+# Build the Ralph prompt for an iteration
+build_prompt() {
+  local workspace="$1"
+  local iteration="$2"
+  
+  cat << EOF
+# Ralph Iteration $iteration
+
+You are an autonomous development agent using the Ralph methodology.
+
+## FIRST: Read State Files
+
+Before doing anything:
+1. Read \`RALPH_TASK.md\` - your task and completion criteria
+2. Read \`.ralph/guardrails.md\` - lessons from past failures (FOLLOW THESE)
+3. Read \`.ralph/progress.md\` - what's been accomplished
+4. Read \`.ralph/errors.log\` - recent failures to avoid
+
+## Working Directory (Critical)
+
+You are already in a git repository. Work HERE, not in a subdirectory:
+
+- Do NOT run \`git init\` - the repo already exists
+- Do NOT run scaffolding commands that create nested directories (\`npx create-*\`, \`npm init\`, etc.)
+- If you need to scaffold, use flags like \`--no-git\` or scaffold into the current directory (\`.\`)
+- All code should live at the repo root or in subdirectories you create manually
+
+## Git Protocol (Critical)
+
+Ralph's strength is state-in-git, not LLM memory. Commit early and often:
+
+1. After completing each criterion, commit your changes:
+   \`git add -A && git commit -m 'ralph: implement state tracker'\`
+   \`git add -A && git commit -m 'ralph: fix async race condition'\`
+   \`git add -A && git commit -m 'ralph: add CLI adapter with commander'\`
+   Always describe what you actually did - never use placeholders like '<description>'
+2. After any significant code change (even partial): commit with descriptive message
+3. Before any risky refactor: commit current state as checkpoint
+4. Push after every 2-3 commits: \`git push\`
+
+If you get rotated, the next agent picks up from your last commit. Your commits ARE your memory.
+
+## Task Execution
+
+1. Work on the next unchecked criterion in RALPH_TASK.md (look for \`[ ]\`)
+2. Run tests after changes (check RALPH_TASK.md for test_command)
+3. **Mark completed criteria**: Edit RALPH_TASK.md and change \`[ ]\` to \`[x]\`
+   - Example: \`- [ ] Implement parser\` becomes \`- [x] Implement parser\`
+   - This is how progress is tracked - YOU MUST update the file
+4. Update \`.ralph/progress.md\` with what you accomplished
+5. When ALL criteria show \`[x]\`: output \`<ralph>COMPLETE</ralph>\`
+6. If stuck 3+ times on same issue: output \`<ralph>GUTTER</ralph>\`
+
+## Learning from Failures
+
+When something fails:
+1. Check \`.ralph/errors.log\` for failure history
+2. Figure out the root cause
+3. Add a Sign to \`.ralph/guardrails.md\` using this format:
+
+\`\`\`
+### Sign: [Descriptive Name]
+- **Trigger**: When this situation occurs
+- **Instruction**: What to do instead
+- **Added after**: Iteration $iteration - what happened
+\`\`\`
+
+## Context Rotation Warning
+
+You may receive a warning that context is running low. When you see it:
+1. Finish your current file edit
+2. Commit and push your changes
+3. Update .ralph/progress.md with what you accomplished and what's next
+4. You will be rotated to a fresh agent that continues your work
+
+Begin by reading the state files.
+EOF
+}
+
+# =============================================================================
+# SPINNER
+# =============================================================================
+
+# Spinner to show the loop is alive (not frozen)
+# Outputs to stderr so it's not captured by $()
+spinner() {
+  local workspace="$1"
+  local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  local i=0
+  while true; do
+    printf "\r  🐛 Agent working... %s  (watch: tail -f %s/.ralph/activity.log)" "${spin:i++%${#spin}:1}" "$workspace" >&2
+    sleep 0.1
+  done
+}
+
+# =============================================================================
+# ITERATION RUNNER
+# =============================================================================
+
+# Run a single agent iteration
+# Returns: signal (ROTATE, GUTTER, COMPLETE, or empty)
+run_iteration() {
+  local workspace="$1"
+  local iteration="$2"
+  local session_id="${3:-}"
+  local script_dir="${4:-$(dirname "${BASH_SOURCE[0]}")}"
+  
+  local prompt=$(build_prompt "$workspace" "$iteration")
+  local fifo="$workspace/.ralph/.parser_fifo"
+  
+  # Create named pipe for parser signals
+  rm -f "$fifo"
+  mkfifo "$fifo"
+  
+  # Use stderr for display (stdout is captured for signal)
+  echo "" >&2
+  echo "═══════════════════════════════════════════════════════════════════" >&2
+  echo "🐛 Ralph Iteration $iteration" >&2
+  echo "═══════════════════════════════════════════════════════════════════" >&2
+  echo "" >&2
+  echo "Workspace: $workspace" >&2
+  echo "Model:     $MODEL" >&2
+  echo "Monitor:   tail -f $workspace/.ralph/activity.log" >&2
+  echo "" >&2
+  
+  # Log session start to progress.md
+  log_progress "$workspace" "**Session $iteration started** (model: $MODEL)"
+  
+  # Build cursor-agent command
+  local cmd="cursor-agent -p --force --output-format stream-json --model $MODEL"
+  
+  if [[ -n "$session_id" ]]; then
+    echo "Resuming session: $session_id" >&2
+    cmd="$cmd --resume=\"$session_id\""
+  fi
+  
+  # Change to workspace
+  cd "$workspace"
+  
+  # Start spinner to show we're alive
+  spinner "$workspace" &
+  local spinner_pid=$!
+  
+  # Start parser in background, reading from cursor-agent
+  # Parser outputs to fifo, we read signals from fifo
+  (
+    eval "$cmd \"$prompt\"" 2>&1 | "$script_dir/stream-parser.sh" "$workspace" > "$fifo"
+  ) &
+  local agent_pid=$!
+  
+  # Read signals from parser
+  local signal=""
+  while IFS= read -r line; do
+    case "$line" in
+      "ROTATE")
+        printf "\r\033[K" >&2  # Clear spinner line
+        echo "🔄 Context rotation triggered - stopping agent..." >&2
+        kill $agent_pid 2>/dev/null || true
+        signal="ROTATE"
+        break
+        ;;
+      "WARN")
+        printf "\r\033[K" >&2  # Clear spinner line
+        echo "⚠️  Context warning - agent should wrap up soon..." >&2
+        # Send interrupt to encourage wrap-up (agent continues but is notified)
+        ;;
+      "GUTTER")
+        printf "\r\033[K" >&2  # Clear spinner line
+        echo "🚨 Gutter detected - agent may be stuck..." >&2
+        signal="GUTTER"
+        # Don't kill yet, let agent try to recover
+        ;;
+      "COMPLETE")
+        printf "\r\033[K" >&2  # Clear spinner line
+        echo "✅ Agent signaled completion!" >&2
+        signal="COMPLETE"
+        # Let agent finish gracefully
+        ;;
+    esac
+  done < "$fifo"
+  
+  # Wait for agent to finish
+  wait $agent_pid 2>/dev/null || true
+  
+  # Stop spinner and clear line
+  kill $spinner_pid 2>/dev/null || true
+  wait $spinner_pid 2>/dev/null || true
+  printf "\r\033[K" >&2  # Clear spinner line
+  
+  # Cleanup
+  rm -f "$fifo"
+  
+  echo "$signal"
+}
+
+# =============================================================================
+# MAIN LOOP
+# =============================================================================
+
+# Run the main Ralph loop
+# Args: workspace
+# Uses global: MAX_ITERATIONS, MODEL, USE_BRANCH, OPEN_PR
+run_ralph_loop() {
+  local workspace="$1"
+  local script_dir="${2:-$(dirname "${BASH_SOURCE[0]}")}"
+  
+  # Commit any uncommitted work first
+  cd "$workspace"
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    echo "📦 Committing uncommitted changes..."
+    git add -A
+    git commit -m "ralph: initial commit before loop" || true
+  fi
+  
+  # Create branch if requested
+  if [[ -n "$USE_BRANCH" ]]; then
+    echo "🌿 Creating branch: $USE_BRANCH"
+    git checkout -b "$USE_BRANCH" 2>/dev/null || git checkout "$USE_BRANCH"
+  fi
+  
+  echo ""
+  echo "🚀 Starting Ralph loop..."
+  echo ""
+  
+  # Main loop
+  local iteration=1
+  local session_id=""
+  
+  while [[ $iteration -le $MAX_ITERATIONS ]]; do
+    # Run iteration
+    local signal
+    signal=$(run_iteration "$workspace" "$iteration" "$session_id" "$script_dir")
+    
+    # Check task completion
+    local task_status
+    task_status=$(check_task_complete "$workspace")
+    
+    if [[ "$task_status" == "COMPLETE" ]]; then
+      log_progress "$workspace" "**Session $iteration ended** - ✅ TASK COMPLETE"
+      echo ""
+      echo "═══════════════════════════════════════════════════════════════════"
+      echo "🎉 RALPH COMPLETE! All criteria satisfied."
+      echo "═══════════════════════════════════════════════════════════════════"
+      echo ""
+      echo "Completed in $iteration iteration(s)."
+      echo "Check git log for detailed history."
+      
+      # Open PR if requested
+      if [[ "$OPEN_PR" == "true" ]] && [[ -n "$USE_BRANCH" ]]; then
+        echo ""
+        echo "📝 Opening pull request..."
+        git push -u origin "$USE_BRANCH" 2>/dev/null || git push
+        if command -v gh &> /dev/null; then
+          gh pr create --fill || echo "⚠️  Could not create PR automatically. Create manually."
+        else
+          echo "⚠️  gh CLI not found. Push complete, create PR manually."
+        fi
+      fi
+      
+      return 0
+    fi
+    
+    # Handle signals
+    case "$signal" in
+      "COMPLETE")
+        # Agent signaled completion - verify with checkbox check
+        if [[ "$task_status" == "COMPLETE" ]]; then
+          log_progress "$workspace" "**Session $iteration ended** - ✅ TASK COMPLETE (agent signaled)"
+          echo ""
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "🎉 RALPH COMPLETE! Agent signaled completion and all criteria verified."
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo ""
+          echo "Completed in $iteration iteration(s)."
+          echo "Check git log for detailed history."
+          
+          # Open PR if requested
+          if [[ "$OPEN_PR" == "true" ]] && [[ -n "$USE_BRANCH" ]]; then
+            echo ""
+            echo "📝 Opening pull request..."
+            git push -u origin "$USE_BRANCH" 2>/dev/null || git push
+            if command -v gh &> /dev/null; then
+              gh pr create --fill || echo "⚠️  Could not create PR automatically. Create manually."
+            else
+              echo "⚠️  gh CLI not found. Push complete, create PR manually."
+            fi
+          fi
+          
+          return 0
+        else
+          # Agent said complete but checkboxes say otherwise - continue
+          log_progress "$workspace" "**Session $iteration ended** - Agent signaled complete but criteria remain"
+          echo ""
+          echo "⚠️  Agent signaled completion but unchecked criteria remain."
+          echo "   Continuing with next iteration..."
+          iteration=$((iteration + 1))
+        fi
+        ;;
+      "ROTATE")
+        log_progress "$workspace" "**Session $iteration ended** - 🔄 Context rotation (token limit reached)"
+        echo ""
+        echo "🔄 Rotating to fresh context..."
+        iteration=$((iteration + 1))
+        session_id=""
+        ;;
+      "GUTTER")
+        log_progress "$workspace" "**Session $iteration ended** - 🚨 GUTTER (agent stuck)"
+        echo ""
+        echo "🚨 Gutter detected. Check .ralph/errors.log for details."
+        echo "   The agent may be stuck. Consider:"
+        echo "   1. Check .ralph/guardrails.md for lessons"
+        echo "   2. Manually fix the blocking issue"
+        echo "   3. Re-run the loop"
+        return 1
+        ;;
+      *)
+        # Agent finished naturally, check if more work needed
+        if [[ "$task_status" == INCOMPLETE:* ]]; then
+          local remaining_count=${task_status#INCOMPLETE:}
+          log_progress "$workspace" "**Session $iteration ended** - Agent finished naturally ($remaining_count criteria remaining)"
+          echo ""
+          echo "📋 Agent finished but $remaining_count criteria remaining."
+          echo "   Starting next iteration..."
+          iteration=$((iteration + 1))
+        fi
+        ;;
+    esac
+    
+    # Brief pause between iterations
+    sleep 2
+  done
+  
+  log_progress "$workspace" "**Loop ended** - ⚠️ Max iterations ($MAX_ITERATIONS) reached"
+  echo ""
+  echo "⚠️  Max iterations ($MAX_ITERATIONS) reached."
+  echo "   Task may not be complete. Check progress manually."
+  return 1
+}
+
+# =============================================================================
+# PREREQUISITE CHECKS
+# =============================================================================
+
+# Check all prerequisites, exit with error message if any fail
+check_prerequisites() {
+  local workspace="$1"
+  local task_file="$workspace/RALPH_TASK.md"
+  
+  # Check for task file
+  if [[ ! -f "$task_file" ]]; then
+    echo "❌ No RALPH_TASK.md found in $workspace"
+    echo ""
+    echo "Create a task file first:"
+    echo "  cat > RALPH_TASK.md << 'EOF'"
+    echo "  ---"
+    echo "  task: Your task description"
+    echo "  test_command: \"npm test\""
+    echo "  ---"
+    echo "  # Task"
+    echo "  ## Success Criteria"
+    echo "  1. [ ] First thing to do"
+    echo "  2. [ ] Second thing to do"
+    echo "  EOF"
+    return 1
+  fi
+  
+  # Check for cursor-agent CLI
+  if ! command -v cursor-agent &> /dev/null; then
+    echo "❌ cursor-agent CLI not found"
+    echo ""
+    echo "Install via:"
+    echo "  curl https://cursor.com/install -fsS | bash"
+    return 1
+  fi
+  
+  # Check for git repo
+  if ! git -C "$workspace" rev-parse --git-dir > /dev/null 2>&1; then
+    echo "❌ Not a git repository"
+    echo "   Ralph requires git for state persistence."
+    return 1
+  fi
+  
+  return 0
+}
+
+# =============================================================================
+# DISPLAY HELPERS
+# =============================================================================
+
+# Show task summary
+show_task_summary() {
+  local workspace="$1"
+  local task_file="$workspace/RALPH_TASK.md"
+  
+  echo "📋 Task Summary:"
+  echo "─────────────────────────────────────────────────────────────────"
+  head -30 "$task_file"
+  echo "─────────────────────────────────────────────────────────────────"
+  echo ""
+  
+  # Count criteria - only actual checkbox list items (- [ ], * [x], 1. [ ], etc.)
+  local total_criteria done_criteria remaining
+  total_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[(x| )\]' "$task_file" 2>/dev/null) || total_criteria=0
+  done_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[x\]' "$task_file" 2>/dev/null) || done_criteria=0
+  remaining=$((total_criteria - done_criteria))
+  
+  echo "Progress: $done_criteria / $total_criteria criteria complete ($remaining remaining)"
+  echo "Model:    $MODEL"
+  echo ""
+  
+  # Return remaining count for caller to check
+  echo "$remaining"
+}
+
+# Show Ralph banner
+show_banner() {
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo "🐛 Ralph Wiggum: Autonomous Development Loop"
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo ""
+  echo "  \"That's the beauty of Ralph - the technique is deterministically"
+  echo "   bad in an undeterministic world.\""
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo ""
+}
+</file>
+
+<file path="scripts/ralph-loop.sh">
+#!/bin/bash
+# Ralph Wiggum: The Loop (CLI Mode)
+#
+# Runs cursor-agent locally with stream-json parsing for accurate token tracking.
+# Handles context rotation via --resume when thresholds are hit.
+#
+# This script is for power users and scripting. For interactive use, see ralph-setup.sh.
+#
+# Usage:
+#   ./ralph-loop.sh                              # Start from current directory
+#   ./ralph-loop.sh /path/to/project             # Start from specific project
+#   ./ralph-loop.sh -n 50 -m gpt-5.2-high        # Custom iterations and model
+#   ./ralph-loop.sh --branch feature/foo --pr   # Create branch and PR
+#   ./ralph-loop.sh -y                           # Skip confirmation (for scripting)
+#
+# Flags:
+#   -n, --iterations N     Max iterations (default: 20)
+#   -m, --model MODEL      Model to use (default: opus-4.5-thinking)
+#   --branch NAME          Create and work on a new branch
+#   --pr                   Open PR when complete (requires --branch)
+#   -y, --yes              Skip confirmation prompt
+#   -h, --help             Show this help
+#
+# Requirements:
+#   - RALPH_TASK.md in the project root
+#   - Git repository
+#   - cursor-agent CLI installed
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common functions
+source "$SCRIPT_DIR/ralph-common.sh"
+
+# =============================================================================
+# FLAG PARSING
+# =============================================================================
+
+show_help() {
+  cat << 'EOF'
+Ralph Wiggum: The Loop (CLI Mode)
+
+Usage:
+  ./ralph-loop.sh [options] [workspace]
+
+Options:
+  -n, --iterations N     Max iterations (default: 20)
+  -m, --model MODEL      Model to use (default: opus-4.5-thinking)
+  --branch NAME          Create and work on a new branch
+  --pr                   Open PR when complete (requires --branch)
+  -y, --yes              Skip confirmation prompt
+  -h, --help             Show this help
+
+Examples:
+  ./ralph-loop.sh                                    # Interactive mode
+  ./ralph-loop.sh -n 50                              # 50 iterations max
+  ./ralph-loop.sh -m gpt-5.2-high                    # Use GPT model
+  ./ralph-loop.sh --branch feature/api --pr -y      # Scripted PR workflow
+  
+Environment:
+  RALPH_MODEL            Override default model (same as -m flag)
+
+For interactive setup with a beautiful UI, use ralph-setup.sh instead.
+EOF
+}
+
+# Parse command line arguments
+WORKSPACE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--iterations)
+      MAX_ITERATIONS="$2"
+      shift 2
+      ;;
+    -m|--model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --branch)
+      USE_BRANCH="$2"
+      shift 2
+      ;;
+    --pr)
+      OPEN_PR=true
+      shift
+      ;;
+    -y|--yes)
+      SKIP_CONFIRM=true
+      shift
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      echo "Use -h for help."
+      exit 1
+      ;;
+    *)
+      # Positional argument = workspace
+      WORKSPACE="$1"
+      shift
+      ;;
+  esac
+done
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+main() {
+  # Resolve workspace
+  if [[ -z "$WORKSPACE" ]]; then
+    WORKSPACE="$(pwd)"
+  elif [[ "$WORKSPACE" == "." ]]; then
+    WORKSPACE="$(pwd)"
+  else
+    WORKSPACE="$(cd "$WORKSPACE" && pwd)"
+  fi
+  
+  local task_file="$WORKSPACE/RALPH_TASK.md"
+  
+  # Show banner
+  show_banner
+  
+  # Check prerequisites
+  if ! check_prerequisites "$WORKSPACE"; then
+    exit 1
+  fi
+  
+  # Validate: PR requires branch
+  if [[ "$OPEN_PR" == "true" ]] && [[ -z "$USE_BRANCH" ]]; then
+    echo "❌ --pr requires --branch"
+    echo "   Example: ./ralph-loop.sh --branch feature/foo --pr"
+    exit 1
+  fi
+  
+  # Initialize .ralph directory
+  init_ralph_dir "$WORKSPACE"
+  
+  echo "Workspace: $WORKSPACE"
+  echo "Task:      $task_file"
+  echo ""
+  
+  # Show task summary
+  echo "📋 Task Summary:"
+  echo "─────────────────────────────────────────────────────────────────"
+  head -30 "$task_file"
+  echo "─────────────────────────────────────────────────────────────────"
+  echo ""
+  
+  # Count criteria
+  local total_criteria done_criteria remaining
+  # Only count actual checkbox list items (- [ ], * [x], 1. [ ], etc.)
+  total_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[(x| )\]' "$task_file" 2>/dev/null) || total_criteria=0
+  done_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[x\]' "$task_file" 2>/dev/null) || done_criteria=0
+  remaining=$((total_criteria - done_criteria))
+  
+  echo "Progress: $done_criteria / $total_criteria criteria complete ($remaining remaining)"
+  echo "Model:    $MODEL"
+  echo "Max iter: $MAX_ITERATIONS"
+  [[ -n "$USE_BRANCH" ]] && echo "Branch:   $USE_BRANCH"
+  [[ "$OPEN_PR" == "true" ]] && echo "Open PR:  Yes"
+  echo ""
+  
+  if [[ "$remaining" -eq 0 ]] && [[ "$total_criteria" -gt 0 ]]; then
+    echo "🎉 Task already complete! All criteria are checked."
+    exit 0
+  fi
+  
+  # Confirm before starting (unless -y flag)
+  if [[ "$SKIP_CONFIRM" != "true" ]]; then
+    echo "This will run cursor-agent locally to work on this task."
+    echo "The agent will be rotated when context fills up (~80k tokens)."
+    echo ""
+    echo "Tip: Use ralph-setup.sh for interactive model/option selection."
+    echo "     Use -y flag to skip this prompt."
+    echo ""
+    read -p "Start Ralph loop? [y/N] " -n 1 -r
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "Aborted."
+      exit 0
+    fi
+  fi
+  
+  # Run the loop
+  run_ralph_loop "$WORKSPACE" "$SCRIPT_DIR"
+  exit $?
+}
+
+main
+</file>
+
+<file path="scripts/ralph-once.sh">
+#!/bin/bash
+# Ralph Wiggum: Single Iteration (Human-in-the-Loop)
+#
+# Runs exactly ONE iteration of the Ralph loop, then stops.
+# Useful for testing your task definition before going AFK.
+#
+# Usage:
+#   ./ralph-once.sh                    # Run single iteration
+#   ./ralph-once.sh /path/to/project   # Run in specific project
+#   ./ralph-once.sh -m gpt-5.2-high    # Use specific model
+#
+# After running:
+#   - Review the changes made
+#   - Check git log for commits
+#   - If satisfied, run ralph-setup.sh or ralph-loop.sh for full loop
+#
+# Requirements:
+#   - RALPH_TASK.md in the project root
+#   - Git repository
+#   - cursor-agent CLI installed
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common functions
+source "$SCRIPT_DIR/ralph-common.sh"
+
+# =============================================================================
+# FLAG PARSING
+# =============================================================================
+
+show_help() {
+  cat << 'EOF'
+Ralph Wiggum: Single Iteration (Human-in-the-Loop)
+
+Runs exactly ONE iteration, then stops for review.
+This is the recommended way to test your task definition.
+
+Usage:
+  ./ralph-once.sh [options] [workspace]
+
+Options:
+  -m, --model MODEL      Model to use (default: opus-4.5-thinking)
+  -h, --help             Show this help
+
+Examples:
+  ./ralph-once.sh                        # Run one iteration
+  ./ralph-once.sh -m sonnet-4.5-thinking # Use Sonnet model
+  
+After reviewing the results:
+  - If satisfied: run ./ralph-setup.sh for full loop
+  - If issues: fix them, update RALPH_TASK.md or guardrails, run again
+EOF
+}
+
+# Parse command line arguments
+WORKSPACE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -m|--model)
+      MODEL="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      echo "Use -h for help."
+      exit 1
+      ;;
+    *)
+      # Positional argument = workspace
+      WORKSPACE="$1"
+      shift
+      ;;
+  esac
+done
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+main() {
+  # Resolve workspace
+  if [[ -z "$WORKSPACE" ]]; then
+    WORKSPACE="$(pwd)"
+  elif [[ "$WORKSPACE" == "." ]]; then
+    WORKSPACE="$(pwd)"
+  else
+    WORKSPACE="$(cd "$WORKSPACE" && pwd)"
+  fi
+  
+  local task_file="$WORKSPACE/RALPH_TASK.md"
+  
+  # Show banner
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo "🐛 Ralph Wiggum: Single Iteration (Human-in-the-Loop)"
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo ""
+  echo "  This runs ONE iteration, then stops for your review."
+  echo "  Use this to test your task before going AFK."
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo ""
+  
+  # Check prerequisites
+  if ! check_prerequisites "$WORKSPACE"; then
+    exit 1
+  fi
+  
+  # Initialize .ralph directory
+  init_ralph_dir "$WORKSPACE"
+  
+  echo "Workspace: $WORKSPACE"
+  echo "Model:     $MODEL"
+  echo ""
+  
+  # Show task summary
+  echo "📋 Task Summary:"
+  echo "─────────────────────────────────────────────────────────────────"
+  head -30 "$task_file"
+  echo "─────────────────────────────────────────────────────────────────"
+  echo ""
+  
+  # Count criteria
+  local total_criteria done_criteria remaining
+  # Only count actual checkbox list items (- [ ], * [x], 1. [ ], etc.)
+  total_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[(x| )\]' "$task_file" 2>/dev/null) || total_criteria=0
+  done_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[x\]' "$task_file" 2>/dev/null) || done_criteria=0
+  remaining=$((total_criteria - done_criteria))
+  
+  echo "Progress: $done_criteria / $total_criteria criteria complete ($remaining remaining)"
+  echo ""
+  
+  if [[ "$remaining" -eq 0 ]] && [[ "$total_criteria" -gt 0 ]]; then
+    echo "🎉 Task already complete! All criteria are checked."
+    exit 0
+  fi
+  
+  # Confirm
+  read -p "Run single iteration? [Y/n] " -n 1 -r
+  echo ""
+  
+  if [[ $REPLY =~ ^[Nn]$ ]]; then
+    echo "Aborted."
+    exit 0
+  fi
+  
+  # Commit any uncommitted work first
+  cd "$WORKSPACE"
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    echo "📦 Committing uncommitted changes..."
+    git add -A
+    git commit -m "ralph: checkpoint before single iteration" || true
+  fi
+  
+  echo ""
+  echo "🚀 Running single iteration..."
+  echo ""
+  
+  # Run exactly one iteration
+  local signal
+  signal=$(run_iteration "$WORKSPACE" "1" "" "$SCRIPT_DIR")
+  
+  # Check result
+  local task_status
+  task_status=$(check_task_complete "$WORKSPACE")
+  
+  echo ""
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo "📋 Single Iteration Complete"
+  echo "═══════════════════════════════════════════════════════════════════"
+  echo ""
+  
+  case "$signal" in
+    "COMPLETE")
+      if [[ "$task_status" == "COMPLETE" ]]; then
+        echo "🎉 Task completed in single iteration!"
+        echo ""
+        echo "All criteria are checked. You're done!"
+      else
+        echo "⚠️  Agent signaled complete but some criteria remain unchecked."
+        echo "   Review the results and run again if needed."
+      fi
+      ;;
+    "GUTTER")
+      echo "🚨 Gutter detected - agent got stuck."
+      echo ""
+      echo "Review .ralph/errors.log and consider:"
+      echo "  1. Adding a guardrail to .ralph/guardrails.md"
+      echo "  2. Simplifying the task"
+      echo "  3. Fixing the blocking issue manually"
+      ;;
+    "ROTATE")
+      echo "🔄 Context rotation was triggered."
+      echo ""
+      echo "The agent used a lot of context. This is normal for complex tasks."
+      echo "Review the progress and run again or proceed to full loop."
+      ;;
+    *)
+      if [[ "$task_status" == "COMPLETE" ]]; then
+        echo "🎉 Task completed in single iteration!"
+      else
+        local remaining_count=${task_status#INCOMPLETE:}
+        echo "Agent finished with $remaining_count criteria remaining."
+      fi
+      ;;
+  esac
+  
+  echo ""
+  echo "Review the changes:"
+  echo "  • git log --oneline -5     # See recent commits"
+  echo "  • git diff HEAD~1          # See changes"
+  echo "  • cat .ralph/progress.md   # See progress log"
+  echo ""
+  echo "Next steps:"
+  echo "  • If satisfied: ./ralph-setup.sh  # Run full loop"
+  echo "  • If issues: fix, update task/guardrails, ./ralph-once.sh again"
+  echo ""
+}
+
+main
+</file>
+
+<file path="scripts/ralph-setup.sh">
+#!/bin/bash
+# Ralph Wiggum: Interactive Setup & Loop
+#
+# THE main entry point for Ralph. Uses gum for a beautiful CLI experience,
+# falls back to simple prompts if gum is not installed.
+#
+# Usage:
+#   ./ralph-setup.sh                    # Interactive setup + run loop
+#   ./ralph-setup.sh /path/to/project   # Run in specific project
+#
+# Requirements:
+#   - RALPH_TASK.md in the project root
+#   - Git repository
+#   - cursor-agent CLI installed
+#   - gum (optional, for enhanced UI): brew install gum
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common functions
+source "$SCRIPT_DIR/ralph-common.sh"
+
+# =============================================================================
+# GUM DETECTION
+# =============================================================================
+
+HAS_GUM=false
+if command -v gum &> /dev/null; then
+  HAS_GUM=true
+fi
+
+# =============================================================================
+# GUM UI HELPERS
+# =============================================================================
+
+# Model options
+MODELS=(
+  "opus-4.5-thinking"
+  "sonnet-4.5-thinking"
+  "gpt-5.2-high"
+  "composer-1"
+  "Custom..."
+)
+
+# Select model using gum or fallback
+select_model() {
+  if [[ "$HAS_GUM" == "true" ]]; then
+    local selected
+    selected=$(gum choose --header "Select model:" "${MODELS[@]}")
+    
+    if [[ "$selected" == "Custom..." ]]; then
+      selected=$(gum input --placeholder "Enter model name" --value "$DEFAULT_MODEL")
+    fi
+    echo "$selected"
+  else
+    echo ""
+    echo "Select model:"
+    local i=1
+    for m in "${MODELS[@]}"; do
+      if [[ "$m" == "Custom..." ]]; then
+        echo "  $i) Custom (enter manually)"
+      else
+        echo "  $i) $m"
+      fi
+      ((i++))
+    done
+    echo ""
+    read -p "Choice [1]: " choice
+    choice="${choice:-1}"
+    
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le ${#MODELS[@]} ]]; then
+      local selected="${MODELS[$((choice-1))]}"
+      if [[ "$selected" == "Custom..." ]]; then
+        read -p "Enter model name: " selected
+      fi
+      echo "$selected"
+    else
+      echo "${MODELS[0]}"
+    fi
+  fi
+}
+
+# Get max iterations using gum or fallback
+get_max_iterations() {
+  if [[ "$HAS_GUM" == "true" ]]; then
+    local value
+    value=$(gum input --header "Max iterations:" --placeholder "20" --value "20")
+    echo "${value:-20}"
+  else
+    read -p "Max iterations [20]: " value
+    echo "${value:-20}"
+  fi
+}
+
+# Multi-select options using gum or fallback
+# Returns space-separated list of selected options
+select_options() {
+  local options=(
+    "Commit to current branch"
+    "Run single iteration first"
+    "Work on new branch"
+    "Open PR when complete"
+  )
+  
+  if [[ "$HAS_GUM" == "true" ]]; then
+    # gum choose --no-limit returns newline-separated selections
+    local selected
+    selected=$(gum choose --no-limit --header "Options (space to select, enter to confirm):" "${options[@]}") || true
+    echo "$selected"
+  else
+    echo ""
+    echo "Options (enter numbers separated by spaces, or press Enter to skip):"
+    local i=1
+    for opt in "${options[@]}"; do
+      echo "  $i) $opt"
+      ((i++))
+    done
+    echo ""
+    read -p "Select options [none]: " choices
+    
+    local selected=""
+    for choice in $choices; do
+      if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le ${#options[@]} ]]; then
+        if [[ -n "$selected" ]]; then
+          selected="$selected"$'\n'"${options[$((choice-1))]}"
+        else
+          selected="${options[$((choice-1))]}"
+        fi
+      fi
+    done
+    echo "$selected"
+  fi
+}
+
+# Get branch name using gum or fallback
+get_branch_name() {
+  if [[ "$HAS_GUM" == "true" ]]; then
+    gum input --header "Branch name:" --placeholder "feature/my-feature"
+  else
+    read -p "Branch name: " branch
+    echo "$branch"
+  fi
+}
+
+# Confirm action using gum or fallback
+confirm_action() {
+  local message="$1"
+  
+  if [[ "$HAS_GUM" == "true" ]]; then
+    gum confirm "$message"
+  else
+    read -p "$message [y/N] " -n 1 -r
+    echo ""
+    [[ $REPLY =~ ^[Yy]$ ]]
+  fi
+}
+
+# Show styled header
+show_header() {
+  local text="$1"
+  if [[ "$HAS_GUM" == "true" ]]; then
+    gum style --border double --padding "0 2" --border-foreground 212 "$text"
+  else
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo "$text"
+    echo "═══════════════════════════════════════════════════════════════════"
+  fi
+}
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+main() {
+  local workspace="${1:-.}"
+  if [[ "$workspace" == "." ]]; then
+    workspace="$(pwd)"
+  fi
+  workspace="$(cd "$workspace" && pwd)"
+  
+  local task_file="$workspace/RALPH_TASK.md"
+  
+  # Show banner
+  echo ""
+  show_header "🐛 Ralph Wiggum: Autonomous Development Loop"
+  echo ""
+  
+  if [[ "$HAS_GUM" == "true" ]]; then
+    echo "  Using gum for enhanced UI ✨"
+  else
+    echo "  💡 Install gum for a better experience: https://github.com/charmbracelet/gum#installation"
+  fi
+  echo ""
+  
+  # Check prerequisites
+  if ! check_prerequisites "$workspace"; then
+    exit 1
+  fi
+  
+  # Initialize .ralph directory
+  init_ralph_dir "$workspace"
+  
+  echo "Workspace: $workspace"
+  echo ""
+  
+  # Show task summary
+  echo "📋 Task Summary:"
+  echo "─────────────────────────────────────────────────────────────────"
+  head -30 "$task_file"
+  echo "─────────────────────────────────────────────────────────────────"
+  echo ""
+  
+  # Count criteria
+  local total_criteria done_criteria remaining
+  # Only count actual checkbox list items (- [ ], * [x], 1. [ ], etc.)
+  total_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[(x| )\]' "$task_file" 2>/dev/null) || total_criteria=0
+  done_criteria=$(grep -cE '^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]+\[x\]' "$task_file" 2>/dev/null) || done_criteria=0
+  remaining=$((total_criteria - done_criteria))
+  
+  echo "Progress: $done_criteria / $total_criteria criteria complete ($remaining remaining)"
+  echo ""
+  
+  if [[ "$remaining" -eq 0 ]] && [[ "$total_criteria" -gt 0 ]]; then
+    echo "🎉 Task already complete! All criteria are checked."
+    exit 0
+  fi
+  
+  # ==========================================================================
+  # INTERACTIVE SETUP
+  # ==========================================================================
+  
+  echo ""
+  if [[ "$HAS_GUM" == "true" ]]; then
+    gum style --foreground 212 "Configure your Ralph session:"
+  else
+    echo "Configure your Ralph session:"
+  fi
+  echo ""
+  
+  # 1. Select model
+  MODEL=$(select_model)
+  echo "✓ Model: $MODEL"
+  
+  # 2. Max iterations
+  MAX_ITERATIONS=$(get_max_iterations)
+  echo "✓ Max iterations: $MAX_ITERATIONS"
+  
+  # 3. Options
+  local selected_options
+  selected_options=$(select_options)
+  
+  # Parse selected options
+  local run_single_first=false
+  USE_BRANCH=""
+  OPEN_PR=false
+  
+  while IFS= read -r opt; do
+    case "$opt" in
+      "Commit to current branch")
+        echo "✓ Will commit to current branch"
+        ;;
+      "Run single iteration first")
+        run_single_first=true
+        echo "✓ Will run single iteration first"
+        ;;
+      "Work on new branch")
+        USE_BRANCH=$(get_branch_name)
+        echo "✓ Branch: $USE_BRANCH"
+        ;;
+      "Open PR when complete")
+        OPEN_PR=true
+        echo "✓ Will open PR when complete"
+        ;;
+    esac
+  done <<< "$selected_options"
+  
+  # Validate: PR requires branch
+  if [[ "$OPEN_PR" == "true" ]] && [[ -z "$USE_BRANCH" ]]; then
+    echo ""
+    echo "⚠️  Opening PR requires a branch. Please specify a branch name:"
+    USE_BRANCH=$(get_branch_name)
+    echo "✓ Branch: $USE_BRANCH"
+  fi
+  
+  echo ""
+  
+  # ==========================================================================
+  # CONFIRMATION
+  # ==========================================================================
+  
+  echo "─────────────────────────────────────────────────────────────────"
+  echo "Summary:"
+  echo "  • Model:      $MODEL"
+  echo "  • Iterations: $MAX_ITERATIONS max"
+  [[ -n "$USE_BRANCH" ]] && echo "  • Branch:     $USE_BRANCH"
+  [[ "$OPEN_PR" == "true" ]] && echo "  • Open PR:    Yes"
+  [[ "$run_single_first" == "true" ]] && echo "  • Test first: Yes (single iteration)"
+  echo "─────────────────────────────────────────────────────────────────"
+  echo ""
+  
+  if ! confirm_action "Start Ralph loop?"; then
+    echo "Aborted."
+    exit 0
+  fi
+  
+  # ==========================================================================
+  # RUN LOOP
+  # ==========================================================================
+  
+  # Export settings for the loop
+  export MODEL
+  export MAX_ITERATIONS
+  export USE_BRANCH
+  export OPEN_PR
+  
+  # Handle single iteration first
+  if [[ "$run_single_first" == "true" ]]; then
+    echo ""
+    echo "🧪 Running single iteration first..."
+    echo ""
+    
+    # Run just one iteration
+    local signal
+    signal=$(run_iteration "$workspace" "1" "" "$SCRIPT_DIR")
+    
+    # Check result
+    local task_status
+    task_status=$(check_task_complete "$workspace")
+    
+    if [[ "$task_status" == "COMPLETE" ]]; then
+      echo ""
+      echo "🎉 Task completed in single iteration!"
+      exit 0
+    fi
+    
+    echo ""
+    echo "Single iteration complete. Review the changes."
+    echo ""
+    
+    if ! confirm_action "Continue with full loop?"; then
+      echo "Stopped after single iteration."
+      exit 0
+    fi
+    
+    # Continue with remaining iterations (start from 2)
+    local iteration=2
+    local session_id=""
+    
+    while [[ $iteration -le $MAX_ITERATIONS ]]; do
+      signal=$(run_iteration "$workspace" "$iteration" "$session_id" "$SCRIPT_DIR")
+      task_status=$(check_task_complete "$workspace")
+      
+      if [[ "$task_status" == "COMPLETE" ]]; then
+        log_progress "$workspace" "**Session $iteration ended** - ✅ TASK COMPLETE"
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════════"
+        echo "🎉 RALPH COMPLETE! All criteria satisfied."
+        echo "═══════════════════════════════════════════════════════════════════"
+        echo ""
+        echo "Completed in $iteration iteration(s)."
+        
+        # Open PR if requested
+        if [[ "$OPEN_PR" == "true" ]] && [[ -n "$USE_BRANCH" ]]; then
+          echo ""
+          echo "📝 Opening pull request..."
+          cd "$workspace"
+          git push -u origin "$USE_BRANCH" 2>/dev/null || git push
+          if command -v gh &> /dev/null; then
+            gh pr create --fill || echo "⚠️  Could not create PR automatically."
+          fi
+        fi
+        
+        exit 0
+      fi
+      
+      case "$signal" in
+        "ROTATE")
+          log_progress "$workspace" "**Session $iteration ended** - 🔄 Context rotation"
+          echo "🔄 Rotating to fresh context..."
+          iteration=$((iteration + 1))
+          session_id=""
+          ;;
+        "GUTTER")
+          log_progress "$workspace" "**Session $iteration ended** - 🚨 GUTTER"
+          echo "🚨 Gutter detected. Check .ralph/errors.log"
+          exit 1
+          ;;
+        *)
+          if [[ "$task_status" == INCOMPLETE:* ]]; then
+            iteration=$((iteration + 1))
+          fi
+          ;;
+      esac
+      
+      sleep 2
+    done
+    
+    echo "⚠️  Max iterations reached."
+    exit 1
+  fi
+  
+  # Run full loop directly
+  run_ralph_loop "$workspace" "$SCRIPT_DIR"
+  exit $?
+}
+
+main "$@"
+</file>
+
+<file path="scripts/stream-parser.sh">
+#!/bin/bash
+# Ralph Wiggum: Stream Parser
+#
+# Parses cursor-agent stream-json output in real-time.
+# Tracks token usage, detects failures/gutter, writes to .ralph/ logs.
+#
+# Usage:
+#   cursor-agent -p --force --output-format stream-json "..." | ./stream-parser.sh /path/to/workspace
+#
+# Outputs to stdout:
+#   - ROTATE when threshold hit (80k tokens)
+#   - WARN when approaching limit (70k tokens)
+#   - GUTTER when stuck pattern detected
+#   - COMPLETE when agent outputs <ralph>COMPLETE</ralph>
+#
+# Writes to .ralph/:
+#   - activity.log: all operations with context health
+#   - errors.log: failures and gutter detection
+
+set -euo pipefail
+
+WORKSPACE="${1:-.}"
+RALPH_DIR="$WORKSPACE/.ralph"
+
+# Ensure .ralph directory exists
+mkdir -p "$RALPH_DIR"
+
+# Thresholds
+WARN_THRESHOLD=70000
+ROTATE_THRESHOLD=80000
+
+# Tracking state
+BYTES_READ=0
+BYTES_WRITTEN=0
+ASSISTANT_CHARS=0
+SHELL_OUTPUT_CHARS=0
+PROMPT_CHARS=0
+TOOL_CALLS=0
+WARN_SENT=0
+
+# Estimate initial prompt size (Ralph prompt is ~2KB + file references)
+PROMPT_CHARS=3000
+
+# Gutter detection - use temp files instead of associative arrays (macOS bash 3.x compat)
+FAILURES_FILE=$(mktemp)
+WRITES_FILE=$(mktemp)
+trap "rm -f $FAILURES_FILE $WRITES_FILE" EXIT
+
+# Get context health emoji
+get_health_emoji() {
+  local tokens=$1
+  local pct=$((tokens * 100 / ROTATE_THRESHOLD))
+  
+  if [[ $pct -lt 60 ]]; then
+    echo "🟢"
+  elif [[ $pct -lt 80 ]]; then
+    echo "🟡"
+  else
+    echo "🔴"
+  fi
+}
+
+calc_tokens() {
+  local total_bytes=$((PROMPT_CHARS + BYTES_READ + BYTES_WRITTEN + ASSISTANT_CHARS + SHELL_OUTPUT_CHARS))
+  echo $((total_bytes / 4))
+}
+
+# Log to activity.log
+log_activity() {
+  local message="$1"
+  local timestamp=$(date '+%H:%M:%S')
+  local tokens=$(calc_tokens)
+  local emoji=$(get_health_emoji $tokens)
+  
+  echo "[$timestamp] $emoji $message" >> "$RALPH_DIR/activity.log"
+}
+
+# Log to errors.log
+log_error() {
+  local message="$1"
+  local timestamp=$(date '+%H:%M:%S')
+  
+  echo "[$timestamp] $message" >> "$RALPH_DIR/errors.log"
+}
+
+# Check and log token status
+log_token_status() {
+  local tokens=$(calc_tokens)
+  local pct=$((tokens * 100 / ROTATE_THRESHOLD))
+  local emoji=$(get_health_emoji $tokens)
+  local timestamp=$(date '+%H:%M:%S')
+  
+  local status_msg="TOKENS: $tokens / $ROTATE_THRESHOLD ($pct%)"
+  
+  if [[ $pct -ge 90 ]]; then
+    status_msg="$status_msg - rotation imminent"
+  elif [[ $pct -ge 72 ]]; then
+    status_msg="$status_msg - approaching limit"
+  fi
+  
+  local breakdown="[read:$((BYTES_READ/1024))KB write:$((BYTES_WRITTEN/1024))KB assist:$((ASSISTANT_CHARS/1024))KB shell:$((SHELL_OUTPUT_CHARS/1024))KB]"
+  echo "[$timestamp] $emoji $status_msg $breakdown" >> "$RALPH_DIR/activity.log"
+}
+
+# Check for gutter conditions
+check_gutter() {
+  local tokens=$(calc_tokens)
+  
+  # Check rotation threshold
+  if [[ $tokens -ge $ROTATE_THRESHOLD ]]; then
+    log_activity "ROTATE: Token threshold reached ($tokens >= $ROTATE_THRESHOLD)"
+    echo "ROTATE" 2>/dev/null || true
+    return
+  fi
+  
+  # Check warning threshold (only emit once per session)
+  if [[ $tokens -ge $WARN_THRESHOLD ]] && [[ $WARN_SENT -eq 0 ]]; then
+    log_activity "WARN: Approaching token limit ($tokens >= $WARN_THRESHOLD)"
+    WARN_SENT=1
+    echo "WARN" 2>/dev/null || true
+  fi
+}
+
+# Track shell command failure
+track_shell_failure() {
+  local cmd="$1"
+  local exit_code="$2"
+  
+  if [[ $exit_code -ne 0 ]]; then
+    # Count failures for this command (grep -c exits 1 if no match, so use || true)
+    local count
+    count=$(grep -c "^${cmd}$" "$FAILURES_FILE" 2>/dev/null) || count=0
+    count=$((count + 1))
+    echo "$cmd" >> "$FAILURES_FILE"
+    
+    log_error "SHELL FAIL: $cmd → exit $exit_code (attempt $count)"
+    
+    if [[ $count -ge 3 ]]; then
+      log_error "⚠️ GUTTER: same command failed ${count}x"
+      echo "GUTTER" 2>/dev/null || true
+    fi
+  fi
+}
+
+# Track file writes for thrashing detection
+track_file_write() {
+  local path="$1"
+  local now=$(date +%s)
+  
+  # Log write with timestamp
+  echo "$now:$path" >> "$WRITES_FILE"
+  
+  # Count writes to this file in last 10 minutes
+  local cutoff=$((now - 600))
+  local count=$(awk -F: -v cutoff="$cutoff" -v path="$path" '
+    $1 >= cutoff && $2 == path { count++ }
+    END { print count+0 }
+  ' "$WRITES_FILE")
+  
+  # Check for thrashing (5+ writes in 10 minutes)
+  if [[ $count -ge 5 ]]; then
+    log_error "⚠️ THRASHING: $path written ${count}x in 10 min"
+    echo "GUTTER" 2>/dev/null || true
+  fi
+}
+
+# Process a single JSON line from stream
+process_line() {
+  local line="$1"
+  
+  # Skip empty lines
+  [[ -z "$line" ]] && return
+  
+  # Parse JSON type
+  local type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null) || return
+  local subtype=$(echo "$line" | jq -r '.subtype // empty' 2>/dev/null) || true
+  
+  case "$type" in
+    "system")
+      if [[ "$subtype" == "init" ]]; then
+        local model=$(echo "$line" | jq -r '.model // "unknown"' 2>/dev/null) || model="unknown"
+        log_activity "SESSION START: model=$model"
+      fi
+      ;;
+      
+    "assistant")
+      # Track assistant message characters
+      local text=$(echo "$line" | jq -r '.message.content[0].text // empty' 2>/dev/null) || text=""
+      if [[ -n "$text" ]]; then
+        local chars=${#text}
+        ASSISTANT_CHARS=$((ASSISTANT_CHARS + chars))
+        
+        # Check for completion sigil
+        if [[ "$text" == *"<ralph>COMPLETE</ralph>"* ]]; then
+          log_activity "✅ Agent signaled COMPLETE"
+          echo "COMPLETE" 2>/dev/null || true
+        fi
+        
+        # Check for gutter sigil
+        if [[ "$text" == *"<ralph>GUTTER</ralph>"* ]]; then
+          log_activity "🚨 Agent signaled GUTTER (stuck)"
+          echo "GUTTER" 2>/dev/null || true
+        fi
+      fi
+      ;;
+      
+    "tool_call")
+      if [[ "$subtype" == "started" ]]; then
+        TOOL_CALLS=$((TOOL_CALLS + 1))
+        
+      elif [[ "$subtype" == "completed" ]]; then
+        # Handle read tool completion
+        if echo "$line" | jq -e '.tool_call.readToolCall.result.success' > /dev/null 2>&1; then
+          local path=$(echo "$line" | jq -r '.tool_call.readToolCall.args.path // "unknown"' 2>/dev/null) || path="unknown"
+          local lines=$(echo "$line" | jq -r '.tool_call.readToolCall.result.success.totalLines // 0' 2>/dev/null) || lines=0
+          
+          local content_size=$(echo "$line" | jq -r '.tool_call.readToolCall.result.success.contentSize // 0' 2>/dev/null) || content_size=0
+          local bytes
+          if [[ $content_size -gt 0 ]]; then
+            bytes=$content_size
+          else
+            bytes=$((lines * 100))  # ~100 chars/line for code
+          fi
+          BYTES_READ=$((BYTES_READ + bytes))
+          
+          local kb=$(echo "scale=1; $bytes / 1024" | bc 2>/dev/null || echo "$((bytes / 1024))")
+          log_activity "READ $path ($lines lines, ~${kb}KB)"
+          
+        # Handle write tool completion
+        elif echo "$line" | jq -e '.tool_call.writeToolCall.result.success' > /dev/null 2>&1; then
+          local path=$(echo "$line" | jq -r '.tool_call.writeToolCall.args.path // "unknown"' 2>/dev/null) || path="unknown"
+          local lines=$(echo "$line" | jq -r '.tool_call.writeToolCall.result.success.linesCreated // 0' 2>/dev/null) || lines=0
+          local bytes=$(echo "$line" | jq -r '.tool_call.writeToolCall.result.success.fileSize // 0' 2>/dev/null) || bytes=0
+          BYTES_WRITTEN=$((BYTES_WRITTEN + bytes))
+          
+          local kb=$(echo "scale=1; $bytes / 1024" | bc 2>/dev/null || echo "$((bytes / 1024))")
+          log_activity "WRITE $path ($lines lines, ${kb}KB)"
+          
+          # Track for thrashing detection
+          track_file_write "$path"
+          
+        # Handle shell tool completion
+        elif echo "$line" | jq -e '.tool_call.shellToolCall.result' > /dev/null 2>&1; then
+          local cmd=$(echo "$line" | jq -r '.tool_call.shellToolCall.args.command // "unknown"' 2>/dev/null) || cmd="unknown"
+          local exit_code=$(echo "$line" | jq -r '.tool_call.shellToolCall.result.exitCode // 0' 2>/dev/null) || exit_code=0
+          
+          local stdout=$(echo "$line" | jq -r '.tool_call.shellToolCall.result.stdout // ""' 2>/dev/null) || stdout=""
+          local stderr=$(echo "$line" | jq -r '.tool_call.shellToolCall.result.stderr // ""' 2>/dev/null) || stderr=""
+          local output_chars=$((${#stdout} + ${#stderr}))
+          SHELL_OUTPUT_CHARS=$((SHELL_OUTPUT_CHARS + output_chars))
+          
+          if [[ $exit_code -eq 0 ]]; then
+            if [[ $output_chars -gt 1024 ]]; then
+              log_activity "SHELL $cmd → exit 0 (${output_chars} chars output)"
+            else
+              log_activity "SHELL $cmd → exit 0"
+            fi
+          else
+            log_activity "SHELL $cmd → exit $exit_code"
+            track_shell_failure "$cmd" "$exit_code"
+          fi
+        fi
+        
+        # Check thresholds after each tool call
+        check_gutter
+      fi
+      ;;
+      
+    "result")
+      local duration=$(echo "$line" | jq -r '.duration_ms // 0' 2>/dev/null) || duration=0
+      local tokens=$(calc_tokens)
+      log_activity "SESSION END: ${duration}ms, ~$tokens tokens used"
+      ;;
+  esac
+}
+
+# Main loop: read JSON lines from stdin
+main() {
+  # Initialize activity log for this session
+  echo "" >> "$RALPH_DIR/activity.log"
+  echo "═══════════════════════════════════════════════════════════════" >> "$RALPH_DIR/activity.log"
+  echo "Ralph Session Started: $(date)" >> "$RALPH_DIR/activity.log"
+  echo "═══════════════════════════════════════════════════════════════" >> "$RALPH_DIR/activity.log"
+  
+  # Track last token log time
+  local last_token_log=$(date +%s)
+  
+  while IFS= read -r line; do
+    process_line "$line"
+    
+    # Log token status every 30 seconds
+    local now=$(date +%s)
+    if [[ $((now - last_token_log)) -ge 30 ]]; then
+      log_token_status
+      last_token_log=$now
+    fi
+  done
+  
+  # Final token status
+  log_token_status
+}
+
+main
+</file>
+
+<file path="SKILL.md">
+---
+name: ralph-wiggum
+description: Implements the Ralph Wiggum autonomous iteration technique with deliberate context management. Use when building greenfield projects, iterating on well-defined tasks, or when continuous autonomous development is needed. Manages context like memory - tracks allocations, prevents redlining, and knows when to start fresh.
+license: MIT
+compatibility: Designed for Cursor (nightly). Requires bash, jq, git.
+metadata:
+  author: Based on Geoffrey Huntley's Ralph technique
+  version: "1.0.0"
+  original: https://ghuntley.com/ralph/
+---
+
+# Ralph Wiggum: Autonomous Iteration with Context Engineering
+
+Ralph is a technique for autonomous AI development. In its purest form, Ralph is a loop that repeatedly feeds the same prompt to an AI agent, letting it iterate on a task until completion. The key insight is that **context is like memory** - when you `malloc()` data into the context window, it cannot be `free()`'d except by starting fresh.
+
+## Core Philosophy
+
+> "That's the beauty of Ralph - the technique is deterministically bad in an undeterministic world."
+
+Ralph will make mistakes. That's expected. Each mistake is an opportunity to add a "sign" (guardrail) that prevents that mistake in the future. Like tuning a guitar, you adjust Ralph until it plays the right notes.
+
+### The malloc/free Metaphor
+
+- **Context is memory**: Everything loaded into the LLM's context window stays there
+- **You cannot free() context**: The only way to clear context is to start a new conversation
+- **One task per context**: Mixed concerns lead to autoregressive failure
+- **Don't redline**: Pushing context to limits degrades performance
+- **Gutter detection**: Once the bowling ball is in the gutter, start fresh
+
+## How This Skill Works
+
+### State Files (The Persistent Memory)
+
+Ralph tracks state in files, NOT in context:
+
+```
+.ralph/
+├── state.md           # Current iteration, task, completion criteria
+├── guardrails.md      # Accumulated "signs" from observed failures  
+├── context-log.md     # What's been loaded into context
+├── failures.md        # Failure patterns for learning
+└── progress.md        # What's been accomplished
+```
+
+### The Iteration Cycle
+
+1. **Read state files** to understand current task and progress
+2. **Check guardrails** for relevant "signs" to follow
+3. **Work on the task** - implement, test, refine
+4. **Update progress** in files (not just context)
+5. **Commit checkpoint** via git
+6. **Evaluate completion** against criteria
+7. **If not complete**: Signal for next iteration
+8. **If stuck**: Detect gutter, suggest fresh context
+
+### Guardrails ("Signs")
+
+When Ralph makes a mistake, add a sign:
+
+```markdown
+## Sign: Don't Jump Off The Slide
+- **Trigger**: When implementing authentication
+- **Instruction**: Always validate tokens before trusting claims
+- **Added after**: Iteration 5 - security vulnerability introduced
+```
+
+Signs accumulate in `guardrails.md` and are injected into future iterations.
+
+## Usage
+
+### Starting a Ralph Loop
+
+Create a `RALPH_TASK.md` file in your project root:
+
+```markdown
+---
+task: Build a REST API for task management
+completion_criteria:
+  - All CRUD endpoints working
+  - Input validation implemented
+  - Tests passing with >80% coverage
+  - API documentation complete
+max_iterations: 50
+---
+
+## Requirements
+
+Build a task management API with the following endpoints:
+- POST /tasks - Create a task
+- GET /tasks - List all tasks
+- GET /tasks/:id - Get a task
+- PUT /tasks/:id - Update a task
+- DELETE /tasks/:id - Delete a task
+
+## Constraints
+
+- Use TypeScript
+- Use Express.js
+- Use SQLite for storage
+- Follow REST conventions
+```
+
+Then tell Cursor: "Start a Ralph loop on this task"
+
+### Monitoring Progress
+
+Check `.ralph/progress.md` to see what's been accomplished:
+
+```markdown
+## Iteration 1
+- Created project structure
+- Implemented POST /tasks endpoint
+- Status: Partial progress
+
+## Iteration 2
+- Added GET endpoints
+- Fixed validation bug
+- Status: Continuing
+```
+
+### When to Start Fresh
+
+Ralph will detect "gutter" situations:
+- Same error repeated 3+ times
+- Context approaching limits
+- Circular failure patterns
+
+When detected, Ralph will suggest: "Context is polluted. Recommend starting fresh conversation."
+
+## Best Practices
+
+### 1. Clear Completion Criteria
+
+❌ Bad: "Make a good API"
+✅ Good: "All tests passing, coverage >80%, docs complete"
+
+### 2. Incremental Goals
+
+❌ Bad: "Build complete e-commerce platform"
+✅ Good: Phase 1: Auth, Phase 2: Products, Phase 3: Cart
+
+### 3. Let Failures Teach
+
+Don't intervene too quickly. Let Ralph fail, then add signs.
+
+### 4. Trust the Files
+
+Progress is in files and git, not in your head or the context.
+
+### 5. Fresh Context is Cheap
+
+Don't hesitate to start fresh. State persists in files.
+
+## Integration with Cursor Hooks
+
+This skill uses Cursor hooks for:
+
+- **beforeSubmitPrompt**: Inject guardrails and context awareness
+- **beforeReadFile**: Track context allocations
+- **afterFileEdit**: Update progress tracking
+- **stop**: Evaluate completion, trigger next iteration or fresh start
+
+See `scripts/` for hook implementations.
+
+## Learn More
+
+- Original technique: https://ghuntley.com/ralph/
+- Context engineering: https://ghuntley.com/gutter/
+- malloc/free metaphor: https://ghuntley.com/allocations/
+</file>
+
+</files>

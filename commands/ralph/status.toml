@@ -1,0 +1,19 @@
+description = "Check Ralph Loop status"
+prompt = """
+Check the current status of the Ralph loop by reading state files.
+
+1. **Check Initialization**:
+   - If `.ralph` directory does not exist, output: "Ralph is not initialized. Run `/ralph:init` first."
+
+2. **Read State**:
+   - Read `RALPH_TASK.md` to get the current goal.
+   - Read `.ralph/progress.md` to get the current iteration and status.
+   - Read `.ralph/guardrails.md` to see the number of learned signs.
+
+3. **Report**:
+   - **Task**: (Task Name from RALPH_TASK.md)
+   - **Status**: (Current State from progress.md)
+   - **Iteration**: (Iteration # from progress.md)
+   - **Guardrails**: (Count of signs)
+   - **Recent Log**: (Show the last 3 entries from progress.md)
+"""

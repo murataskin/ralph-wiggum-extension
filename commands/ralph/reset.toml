@@ -1,0 +1,12 @@
+description = "Reset Ralph state (delete .ralph directory)"
+prompt = """
+You are about to reset the Ralph Wiggum state.
+
+**Action**:
+1.  Check if `.ralph/` or `RALPH_TASK.md` exists.
+2.  **Ask the user for explicit confirmation** to delete them. "Are you sure you want to delete the Ralph state (Progress, Guardrails, Task)?"
+3.  If confirmed:
+    - Delete `.ralph/` directory (recursive).
+    - Delete `RALPH_TASK.md`.
+    - Output "Ralph state reset. Memory wiped."
+"""

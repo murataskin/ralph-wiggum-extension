@@ -1,0 +1,72 @@
+description = "Initialize Ralph Wiggum state files (.ralph directory)"
+prompt = """
+You are initializing the Ralph Wiggum state.
+
+**Goal**: Create the `.ralph` directory and necessary state files using your file writing tools.
+
+**Steps**:
+
+1.  **Check for existence**: Check if `RALPH_TASK.md` or `.ralph/` already exists.
+    - If they exist, ask the user if they want to overwrite them.
+
+2.  **Create Files**:
+
+    **File 1: `.ralph/guardrails.md`**
+    ```markdown
+    # Ralph Guardrails (Signs)
+    > "Ralph is a bash loop that keeps starting over."
+    > READ THESE SIGNS BEFORE ACTING.
+
+    ## Core Signs
+
+    ### Sign: Read Before Writing
+    - **Trigger**: Before modifying any existing file.
+    - **Instruction**: Always read the file content first to understand context.
+
+    ### Sign: Test After Changes
+    - **Trigger**: After applying edits.
+    - **Instruction**: Run relevant tests to verify the fix.
+
+    ### Sign: Update Progress
+    - **Trigger**: After completing a sub-task.
+    - **Instruction**: Log it in .ralph/progress.md.
+    ```
+
+    **File 2: `.ralph/progress.md`**
+    ```markdown
+    # Progress Log
+    > The persistent memory of the loop.
+
+    **Status**: Initialized
+    **Iteration**: 0
+
+    ## Work Log
+    - [x] Initialized Ralph state.
+    ```
+
+    **File 3: `RALPH_TASK.md`**
+    ```markdown
+    ---
+    status: todo
+    ---
+
+    # Task: [Describe Your Task Here]
+
+    ## Objective
+    [Brief description]
+
+    ## Success Criteria
+    The task is complete when ALL of the following are true:
+    - [ ] Criterion 1
+    - [ ] Criterion 2
+    ```
+
+3.  **Update .gitignore**:
+    - Read `.gitignore`.
+    - If `.ralph/` is not listed, append it.
+
+4.  **Final Message**:
+    "✅ Ralph Initialized.
+    1. Edit `RALPH_TASK.md`.
+    2. Run `/ralph:loop` to start working."
+"""

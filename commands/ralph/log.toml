@@ -1,0 +1,13 @@
+description = "Log progress to the Ralph history"
+prompt = """
+You are logging a progress entry to `.ralph/progress.md`.
+
+**Input**: A description of the work completed.
+
+**Steps**:
+1.  **Read `.ralph/progress.md`**.
+2.  **Append** the new entry to the "Work Log" section. Use a checkbox format if appropriate:
+    `- [x] [Input Description]`
+3.  **Update Status** if necessary (e.g., if the user says "Completed phase 1", update the "Current State" field at the top).
+4.  **Confirm** the log entry.
+"""

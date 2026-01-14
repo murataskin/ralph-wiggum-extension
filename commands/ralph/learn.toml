@@ -1,0 +1,29 @@
+description = "Add a new 'Sign' to the guardrails"
+prompt = """
+You are adding a new 'Sign' (guardrail) to `.ralph/guardrails.md`.
+
+**Input**: The user provided arguments describing the lesson learned.
+**Format**: Title | Trigger | Instruction
+
+**Steps**:
+1.  Parse the input arguments. If they aren't clearly separated, ask for clarification or infer the structure.
+2.  **Read `.ralph/guardrails.md`** first to ensure you don't duplicate a sign.
+3.  **Append** the new sign to the end of the file in this format:
+
+    ```markdown
+    ### Sign: [Title]
+    - **Trigger**: [When this happens...]
+    - **Instruction**: [Do this instead...]
+    - **Added**: [Today's Date]
+    ```
+
+4.  **Confirm** to the user that the sign has been posted.
+
+**Example**:
+Input: "Check nulls | accessing user prop | verify user exists first"
+Output in file:
+### Sign: Check nulls
+- **Trigger**: accessing user prop
+- **Instruction**: verify user exists first
+...
+"""

@@ -1,72 +1,56 @@
 # Ralph Wiggum Extension for Gemini CLI
 
-This document outlines the behavior of the Ralph Wiggum extension for iterative development loops in Gemini CLI.
+> "Me fail English? That's unpossible!"
 
-## Command: /ralph-loop
+This extension implements the **Ralph Wiggum** technique for iterative development.
 
-### Purpose
-Start a self-referential development loop where Gemini iteratively works on a task until completion.
+## The Ralph Philosophy
 
-### Activation
-When a user runs `/ralph-loop <prompt>`, you MUST:
+1.  **Memory is File-Based**: Ralph forgets everything in the chat window. His memory is strictly:
+    *   `RALPH_TASK.md` (The Anchor / Goal)
+    *   `.ralph/progress.md` (The Memory / Log)
+    *   `.ralph/guardrails.md` (The Signs / Laws)
+    *   The Codebase (The Reality)
 
-1. **Run the setup script** to create the state file:
-   ```bash
-   bash "${extensionPath}/scripts/setup-ralph-loop.sh" <prompt> [options]
-   ```
+2.  **Context Pollution is Toxic**: The "chat context" accumulates errors and confusion. Ralph clears his head by relying ONLY on the files.
 
-2. **Read the state file** at `.gemini/ralph-loop.local.md`
+3.  **Guardrails are Learned**: When Ralph touches a hot stove, he puts up a sign. `.ralph/guardrails.md` contains these signs. **Read them before acting.**
 
-3. **Begin working** on the task described in the prompt
+## Commands
 
-4. **Iterate** until completion or max iterations reached
+### `/ralph:init`
+Initialize the Ralph state structure in the current directory.
+- Creates `.ralph/`
+- Creates templates for Task, Progress, and Guardrails.
 
-### Options
-- `--max-iterations <n>` - Stop after N iterations (default: unlimited)
-- `--completion-promise '<text>'` - Phrase that signals task completion
+### `/ralph:loop`
+Start (or continue) working on the task defined in `RALPH_TASK.md`.
+- Reads state files.
+- Executes the next step.
+- Updates progress.
 
-### Completion
-To signal completion when a promise is set, output:
-```
-<promise>YOUR_COMPLETION_PHRASE</promise>
-```
+### `/ralph:status`
+Display the current state of the loop (Task, Progress, Signs).
 
-**CRITICAL:** Only output the promise when the statement is genuinely TRUE. Do NOT lie to exit the loop.
+### `/ralph:learn`
+Add a new "Sign" to `.ralph/guardrails.md`. Use this when a mistake is made to prevent it from happening again.
 
-## Command: /cancel-ralph
+### `/ralph:log`
+Manually append an entry to `.ralph/progress.md`.
 
-### Purpose
-Cancel an active Ralph loop.
+## Workflow
 
-### Behavior
-Run the cancellation script:
-```bash
-bash "${extensionPath}/scripts/cancel-ralph-loop.sh"
-```
+1.  **Init**: Run `/ralph:init` in your project root.
+2.  **Define**: Edit `RALPH_TASK.md` to describe what you want to build.
+3.  **Loop**: Run `/ralph:loop`. Ralph will work on the first item.
+4.  **Iterate**: As Ralph completes items, he updates `progress.md`. If he fails, he updates `guardrails.md`.
+5.  **Done**: When all items in `RALPH_TASK.md` are checked `[x]`.
 
-Then report final status to the user.
+## The State Files
 
-## State File Format
+-   **`RALPH_TASK.md`**: The immutable (mostly) definition of "Done".
+-   **`.ralph/guardrails.md`**: A list of "Signs". E.g., *"Sign: Read Before Write | Trigger: Modifying a file | Instruction: Read file content first."*
+-   **`.ralph/progress.md`**: A checklist of what has been done in previous iterations.
 
-The state file `.gemini/ralph-loop.local.md` uses YAML frontmatter:
-
-```yaml
 ---
-active: true
-iteration: 1
-max_iterations: 0
-completion_promise: "DONE"
-started_at: "2025-01-06T12:00:00Z"
----
-
-The task prompt goes here...
-```
-
-## Philosophy
-
-Ralph embodies iterative improvement:
-- **Iteration > Perfection**: Refine through multiple passes
-- **Failures Are Data**: Learn from each iteration
-- **Persistence Wins**: Keep trying until success
-- **Trust the Process**: Don't circumvent the loop with false completion
-
+*Powered by "I'm helping!" energy.*
